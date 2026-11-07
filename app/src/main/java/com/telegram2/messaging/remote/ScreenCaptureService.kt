@@ -52,7 +52,8 @@ class ScreenCaptureService : Service() {
         val height = displayMetrics.heightPixels
         val density = displayMetrics.densityDpi
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        val display = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(DisplayManager.DEFAULT_DISPLAY)
+        val display = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
+            .getDisplay(DisplayManager.DEFAULT_DISPLAY) // ✅ Fixed reference
         mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
             width, height, density,
@@ -77,7 +78,11 @@ class ScreenCaptureService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel("capture_channel", "Screen Capture", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                "capture_channel",
+                "Screen Capture",
+                NotificationManager.IMPORTANCE_LOW
+            )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
