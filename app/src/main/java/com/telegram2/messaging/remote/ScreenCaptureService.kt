@@ -53,7 +53,7 @@ class ScreenCaptureService : Service() {
         val density = displayMetrics.densityDpi
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         val display = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
-            .getDisplay(DisplayManager.DEFAULT_DISPLAY) // ✅ Fixed reference
+            .getDisplay(DisplayManager.DEFAULT_DISPLAY)   // ✅ FIXED
         mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
             width, height, density,
