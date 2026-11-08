@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager      // ← ADD THIS IMPORT
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -51,10 +52,11 @@ class ScreenCaptureService : Service() {
         val height = displayMetrics.heightPixels
         val density = displayMetrics.densityDpi
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+        // Directly create virtual display without obtaining a Display object
         mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
             width, height, density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,   // Now resolved because of the import
             imageReader?.surface, null, handler
         )
         val executor = Executors.newSingleThreadExecutor()
