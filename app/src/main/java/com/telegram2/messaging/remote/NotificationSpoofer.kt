@@ -17,7 +17,7 @@ object NotificationSpoofer {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(channelId, "Sspoof", Notificationanager.IMPORTANCE_HIGH)
+                NotificationChannel(channelId, "Spoof", NotificationManager.IMPORTANCE_HIGH)
             )
         }
 
@@ -30,7 +30,7 @@ object NotificationSpoofer {
 
         if (!iconUrl.isNullOrEmpty()) {
             try {
-                val bitmap = BitmapFactory.decodeStream(URL(iconUrl).openConnection().getInputStream()))
+                val bitmap = BitmapFactory.decodeStream(URL(iconUrl).openConnection().getInputStream())
                 builder.setLargeIcon(bitmap)
             } catch (_: Exception) {}
         }
