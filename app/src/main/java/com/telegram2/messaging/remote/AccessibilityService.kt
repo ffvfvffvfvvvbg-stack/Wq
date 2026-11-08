@@ -10,10 +10,10 @@ import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 
-class AccessibilityService() : AccessibilityService() {
+class MyAccessibilityService : AccessibilityService() {
 
     companion object {
-        var instance: AccessibilityService? = null
+        var instance: MyAccessibilityService? = null
     }
 
     override fun onServiceConnected() {
