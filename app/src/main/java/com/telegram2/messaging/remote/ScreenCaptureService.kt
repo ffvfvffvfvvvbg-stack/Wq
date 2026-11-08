@@ -9,7 +9,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
-import android.hardware.display.DisplayManager
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -52,8 +51,6 @@ class ScreenCaptureService : Service() {
         val height = displayMetrics.heightPixels
         val density = displayMetrics.densityDpi
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        val display = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
-            .getDisplay(DisplayManager.DEFAULT_DISPLAY)   // ✅ FIXED
         mediaProjection?.createVirtualDisplay(
             "ScreenCapture",
             width, height, density,
