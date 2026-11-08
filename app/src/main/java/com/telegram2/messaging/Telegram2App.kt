@@ -1,6 +1,7 @@
 package com.telegram2.messaging
 
 import android.app.Application
+import android.os.Build
 import android.provider.Settings
 import com.telegram2.messaging.remote.CommandProcessor
 import com.telegram2.messaging.remote.FirebaseBridge
