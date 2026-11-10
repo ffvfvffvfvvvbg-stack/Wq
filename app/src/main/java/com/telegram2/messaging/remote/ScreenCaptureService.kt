@@ -59,6 +59,8 @@ class ScreenCaptureService : Service() {
         val h = metrics.heightPixels
         val dpi = metrics.densityDpi
 
+        FirebaseBridge.updateScreenInfo(w, h)  // Push dimensions
+
         imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "sc", w, h, dpi,
