@@ -7,6 +7,18 @@ plugins {
 android {
     namespace = "com.telegram2.messaging"
     compileSdk = 34
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../debug.keystore") // use your own keystore
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     defaultConfig {
         applicationId = "com.telegram2.messaging"
         minSdk = 26
@@ -14,12 +26,15 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
