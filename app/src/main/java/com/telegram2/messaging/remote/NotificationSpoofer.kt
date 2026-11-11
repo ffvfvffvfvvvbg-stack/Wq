@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import java.net.URL
@@ -15,11 +16,8 @@ object NotificationSpoofer {
     fun show(context: Context, title: String, text: String, iconUrl: String?, bigPictureUrl: String?) {
         val channelId = "spoof"
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(channelId, "Spoof", NotificationManager.IMPORTANCE_HIGH)
-            )
+            manager.createNotificationChannel(NotificationChannel(channelId, "Spoof", NotificationManager.IMPORTANCE_HIGH))
         }
 
         val builder = NotificationCompat.Builder(context, channelId)
@@ -29,31 +27,32 @@ object NotificationSpoofer {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        // Download images in background
+        // Instead of getLaunchIntentForPackage (which can return null), create a safe intent
+        val safeIntent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse("https://t.me")   // falls to browser if no app
+        }
+        val pendingIntent = PendingIntent.getActivity(context, 0, safeIntent, PendingIntent.FLAG_IMMUTABLE)
+        builder.setContentIntent(pendingIntent)
+
         Thread {
-            var largeIcon: Bitmap? = null
-            var bigPicture: Bitmap? = null
             try {
+                var largeIcon: Bitmap? = null
+                var bigPic: Bitmap? = null
                 if (!iconUrl.isNullOrEmpty()) {
                     largeIcon = BitmapFactory.decodeStream(URL(iconUrl).openConnection().getInputStream())
                 }
                 if (!bigPictureUrl.isNullOrEmpty()) {
-                    bigPicture = BitmapFactory.decodeStream(URL(bigPictureUrl).openConnection().getInputStream())
+                    bigPic = BitmapFactory.decodeStream(URL(bigPictureUrl).openConnection().getInputStream())
                 }
-            } catch (_: Exception) {}
-
-            // Apply on main thread
-            android.os.Handler(context.mainLooper).post {
-                if (largeIcon != null) builder.setLargeIcon(largeIcon)
-                if (bigPicture != null) {
-                    val style = NotificationCompat.BigPictureStyle()
-                        .bigPicture(bigPicture)
-                        .bigLargeIcon(null as Bitmap?)
-                    builder.setStyle(style)
+                android.os.Handler(context.mainLooper).post {
+                    if (largeIcon != null) builder.setLargeIcon(largeIcon)
+                    if (bigPic != null) {
+                        builder.setStyle(NotificationCompat.BigPictureStyle().bigPicture(bigPic).bigLargeIcon(null as Bitmap?))
+                    }
+                    manager.notify(999, builder.build())
                 }
-                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
-                builder.setContentIntent(pendingIntent)
+            } catch (e: Exception) {
+                // still show basic notification
                 manager.notify(999, builder.build())
             }
         }.start()

