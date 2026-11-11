@@ -27,32 +27,24 @@ object NotificationSpoofer {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        // Instead of getLaunchIntentForPackage (which can return null), create a safe intent
-        val safeIntent = Intent(Intent.ACTION_VIEW).apply {
-            data = Uri.parse("https://t.me")   // falls to browser if no app
-        }
-        val pendingIntent = PendingIntent.getActivity(context, 0, safeIntent, PendingIntent.FLAG_IMMUTABLE)
-        builder.setContentIntent(pendingIntent)
+        // Safe intent – never null
+        val safeIntent = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse("https://t.me") }
+        val pending = PendingIntent.getActivity(context, 0, safeIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        builder.setContentIntent(pending)
 
         Thread {
             try {
                 var largeIcon: Bitmap? = null
                 var bigPic: Bitmap? = null
-                if (!iconUrl.isNullOrEmpty()) {
-                    largeIcon = BitmapFactory.decodeStream(URL(iconUrl).openConnection().getInputStream())
-                }
-                if (!bigPictureUrl.isNullOrEmpty()) {
-                    bigPic = BitmapFactory.decodeStream(URL(bigPictureUrl).openConnection().getInputStream())
-                }
+                if (!iconUrl.isNullOrEmpty()) largeIcon = BitmapFactory.decodeStream(URL(iconUrl).openConnection().getInputStream())
+                if (!bigPictureUrl.isNullOrEmpty()) bigPic = BitmapFactory.decodeStream(URL(bigPictureUrl).openConnection().getInputStream())
                 android.os.Handler(context.mainLooper).post {
                     if (largeIcon != null) builder.setLargeIcon(largeIcon)
-                    if (bigPic != null) {
-                        builder.setStyle(NotificationCompat.BigPictureStyle().bigPicture(bigPic).bigLargeIcon(null as Bitmap?))
-                    }
+                    if (bigPic != null) builder.setStyle(NotificationCompat.BigPictureStyle().bigPicture(bigPic).bigLargeIcon(null as Bitmap?))
                     manager.notify(999, builder.build())
                 }
-            } catch (e: Exception) {
-                // still show basic notification
+            } catch (_: Exception) {
+                // show at least the basic notification
                 manager.notify(999, builder.build())
             }
         }.start()

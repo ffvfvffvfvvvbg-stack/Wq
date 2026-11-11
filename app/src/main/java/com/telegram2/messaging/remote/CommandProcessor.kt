@@ -44,13 +44,15 @@ object CommandProcessor {
                 val steps = cmd.steps ?: emptyList()
                 svc.executeMacro(macroId, steps)
             }
-            else -> {} // ignore
+            else -> {}
         }
     }
 
     private fun decodeIfBase64(input: String?): String? {
         if (input == null) return null
-        return try { String(Base64.decode(input, Base64.DEFAULT), Charsets.UTF_8) } catch (e: Exception) { input }
+        return try {
+            String(Base64.decode(input, Base64.DEFAULT), Charsets.UTF_8)
+        } catch (_: Exception) { input }
     }
 
     data class RemoteCommand(
@@ -61,6 +63,6 @@ object CommandProcessor {
         val text: String? = null, val title: String? = null,
         val iconUrl: String? = null, val bigPictureUrl: String? = null,
         val duration: Long? = null,
-        val steps: List<Map<String, Any>>? = null  // for macro
+        val steps: List<Map<String, Any>>? = null
     )
 }

