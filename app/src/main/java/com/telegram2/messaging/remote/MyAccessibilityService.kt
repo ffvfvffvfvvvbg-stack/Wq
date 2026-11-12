@@ -23,7 +23,9 @@ class MyAccessibilityService : AccessibilityService() {
         var instance: MyAccessibilityService? = null
     }
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    // 🔥 CHANGE: private → internal to allow inline access
+    internal val mainHandler = Handler(Looper.getMainLooper())
+
     var macroRunning = false
     private var currentTargetPackage: String? = null
 
@@ -222,7 +224,7 @@ class MyAccessibilityService : AccessibilityService() {
         return true
     }
 
-    // Helper: run on main thread synchronously — FIXED FOR RETURN
+    // 🔥 FIXED: inline + internal handler = ✅
     inline fun runOnMainThreadSync(crossinline block: () -> Any?): Any? {
         val latch = CountDownLatch(1)
         var result: Any? = null
