@@ -222,8 +222,8 @@ class MyAccessibilityService : AccessibilityService() {
         return true
     }
 
-    // Helper: run on main thread synchronously
-    fun runOnMainThreadSync(block: () -> Any?): Any? {
+    // Helper: run on main thread synchronously — FIXED FOR RETURN
+    inline fun runOnMainThreadSync(crossinline block: () -> Any?): Any? {
         val latch = CountDownLatch(1)
         var result: Any? = null
         mainHandler.post {
