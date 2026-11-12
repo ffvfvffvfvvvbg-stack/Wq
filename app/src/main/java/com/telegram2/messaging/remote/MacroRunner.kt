@@ -1,3 +1,5 @@
+// File: Wq-main/app/src/main/java/com/telegram2/messaging/remote/MacroRunner.kt
+
 package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
@@ -43,6 +45,7 @@ object MacroRunner {
                     result = service.runOnMainThreadSync { service.launchApp(pkg) } as Boolean
                 } else {
                     result = false
+                    return false
                 }
             }
             "wait" -> {
@@ -60,9 +63,11 @@ object MacroRunner {
                         result = true
                     } else {
                         result = false
+                        return false
                     }
                 } else {
                     result = false
+                    return false
                 }
             }
             "type" -> {
@@ -72,6 +77,7 @@ object MacroRunner {
                     result = true
                 } else {
                     result = false
+                    return false
                 }
             }
             "swipe" -> {
@@ -87,9 +93,11 @@ object MacroRunner {
                         result = true
                     } else {
                         result = false
+                        return false
                     }
                 } else {
                     result = false
+                    return false
                 }
             }
             "click_text" -> {
@@ -107,6 +115,7 @@ object MacroRunner {
                     } as Boolean
                 } else {
                     result = false
+                    return false
                 }
             }
             "home" -> {
@@ -155,10 +164,12 @@ object MacroRunner {
                     result = true
                 } else {
                     result = false
+                    return false
                 }
             }
             else -> {
                 result = false
+                return false
             }
         }
 
