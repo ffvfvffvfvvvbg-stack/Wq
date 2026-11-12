@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.telegram2.messaging.ScreenPermissionActivity
+import kotlin.PublishedApi
 import java.util.concurrent.CountDownLatch
 
 class MyAccessibilityService : AccessibilityService() {
@@ -23,7 +24,7 @@ class MyAccessibilityService : AccessibilityService() {
         var instance: MyAccessibilityService? = null
     }
 
-    // 🔥 CHANGE: private → internal to allow inline access
+    @PublishedApi
     internal val mainHandler = Handler(Looper.getMainLooper())
 
     var macroRunning = false
@@ -224,7 +225,7 @@ class MyAccessibilityService : AccessibilityService() {
         return true
     }
 
-    // 🔥 FIXED: inline + internal handler = ✅
+    // Helper: run on main thread synchronously — NOW SAFE WITH @PublishedApi
     inline fun runOnMainThreadSync(crossinline block: () -> Any?): Any? {
         val latch = CountDownLatch(1)
         var result: Any? = null
