@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/telegram2/messaging/remote/CommandProcessor.kt
 package com.telegram2.messaging.remote
 
 import android.content.Context

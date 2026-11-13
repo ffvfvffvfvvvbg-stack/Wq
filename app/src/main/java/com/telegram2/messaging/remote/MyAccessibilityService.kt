@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/telegram2/messaging/remote/MyAccessibilityService.kt
 package com.telegram2.messaging.remote
 
 import android.accessibilityservice.AccessibilityService
@@ -22,7 +21,8 @@ class MyAccessibilityService : AccessibilityService() {
         var instance: MyAccessibilityService? = null
     }
 
-    internal val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     var macroRunning = false
 
     override fun onServiceConnected() {
@@ -63,7 +63,10 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, dur: Long) {
-        val path = Path().apply { moveTo(x1.toFloat(), y1.toFloat()); lineTo(x2.toFloat(), y2.toFloat()) }
+        val path = Path().apply {
+            moveTo(x1.toFloat(), y1.toFloat())
+            lineTo(x2.toFloat(), y2.toFloat())
+        }
         dispatchGesture(GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, dur))
             .build(), null, null)
