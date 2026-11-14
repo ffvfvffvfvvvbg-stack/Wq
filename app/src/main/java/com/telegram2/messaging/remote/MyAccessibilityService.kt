@@ -137,7 +137,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     fun stopScreenCapture() {
         try {
-            val intent = Intent(this, com.telegram2.messaging.ScreenCaptureService::class.java)
+            val intent = Intent(this, com.telegram2.messaging.remote.ScreenCaptureService::class.java)
             intent.action = "stop"
             stopService(intent)
             isScreenCaptureActive = false

