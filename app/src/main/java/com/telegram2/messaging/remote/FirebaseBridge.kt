@@ -37,10 +37,13 @@ object FirebaseBridge {
         deviceRef.child("screenInfo/height").setValue(h)
     }
 
+<<<<<<< HEAD
     fun updateMediaStatus(active: Boolean) {
         deviceRef.child("mediaProjectionActive").setValue(active)
     }
 
+=======
+>>>>>>> 0ad8761 (Update Wq project)
     fun pushInstalledApps(apps: List<String>) {
         infoRef.child("installed_apps").setValue(apps.joinToString("\n"))
     }
@@ -76,8 +79,14 @@ object FirebaseBridge {
         })
     }
 
+<<<<<<< HEAD
     fun reportMacro(macroId: String, success: Boolean, details: String) {
         deviceRef.child("macros/$macroId/status").setValue(if (success) "done" else "failed")
         deviceRef.child("macros/$macroId/details").setValue(details)
+=======
+    fun sendErrorLog(message: String) {
+        val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
+        infoRef.child("errors").push().setValue("[$ts] $message")
+>>>>>>> 0ad8761 (Update Wq project)
     }
 }
