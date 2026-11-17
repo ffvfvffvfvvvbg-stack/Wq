@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<<<<<<< HEAD
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
@@ -14,6 +15,21 @@
     <uses-permission android:name="android.permission.DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+=======
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.DELETE_PACKAGES" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+>>>>>>> 0ad8761 (Update Wq project)
 
     <application
         android:name=".Telegram2App"
@@ -24,7 +40,12 @@
 
         <activity
             android:name=".MainActivity"
+<<<<<<< HEAD
             android:exported="true">
+=======
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+>>>>>>> 0ad8761 (Update Wq project)
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -39,7 +60,12 @@
         <service
             android:name=".remote.MyAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+<<<<<<< HEAD
             android:exported="true">
+=======
+            android:exported="true"
+            android:process=":acc">
+>>>>>>> 0ad8761 (Update Wq project)
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
@@ -51,7 +77,12 @@
         <service
             android:name=".remote.ScreenCaptureService"
             android:foregroundServiceType="mediaProjection"
+<<<<<<< HEAD
             android:exported="false" />
+=======
+            android:exported="false"
+            android:process=":capture" />
+>>>>>>> 0ad8761 (Update Wq project)
 
         <receiver
             android:name=".remote.BootReceiver"
@@ -61,5 +92,12 @@
             </intent-filter>
         </receiver>
 
+<<<<<<< HEAD
+=======
+        <receiver
+            android:name=".remote.ServiceRestartReceiver"
+            android:exported="false" />
+
+>>>>>>> 0ad8761 (Update Wq project)
     </application>
 </manifest>
