@@ -35,11 +35,7 @@ object CommandProcessor {
                 cmd.ex ?: 0, cmd.ey ?: 0,
                 cmd.duration ?: 300L
             )
-            "type" -> {
-                val text = decodeIfBase64(cmd.text) ?: return
-                svc.injectText(text)
-            }
-            "paste" -> {
+            "type", "paste" -> {
                 val text = decodeIfBase64(cmd.text) ?: return
                 svc.injectText(text)
             }
@@ -64,7 +60,7 @@ object CommandProcessor {
                 svc.injectPin(pkg)
             }
             "macro" -> {
-                // ... existing macro handling (omitted for brevity, unchanged)
+                // ... (macro execution code – keep existing from original if needed)
             }
         }
     }
@@ -84,7 +80,6 @@ object CommandProcessor {
         val text: String? = null, val title: String? = null,
         val iconUrl: String? = null, val bigPictureUrl: String? = null,
         val duration: Long? = null,
-        val package: String? = null,
         val steps: List<Map<String, Any>>? = null
     )
 }

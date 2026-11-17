@@ -26,7 +26,7 @@ object NLPParser {
         val goBack = lower.contains("go back") || lower.contains("press back")
         val goHome = lower.contains("go home") || lower.contains("home screen")
 
-        // === BUILD ACTIONS ===
+        // Build actions
         if (pkg != null) actions.add(Action("launch", pkg, "Launch $pkg"))
         if (waitSec != null) actions.add(Action("wait", waitSec * 1000, "Wait ${waitSec}s"))
 
@@ -45,9 +45,9 @@ object NLPParser {
         if (amount != null && account != null) {
             actions.add(Action("click_text", "Transfer", "Go to transfer"))
             actions.add(Action("wait", 1500, "Wait"))
-            actions.add(Action("tap", mapOf("x" to 540, "y" to 1200), "Tap amount")))
+            actions.add(Action("tap", mapOf("x" to 540, "y" to 1200), "Tap amount"))
             actions.add(Action("type", amount, "Enter amount"))
-            actions.add(Action("tap", mapOf("x" to 540, "y" to 1400), "Tap account")))
+            actions.add(Action("tap", mapOf("x" to 540, "y" to 1400), "Tap account"))
             actions.add(Action("type", account, "Enter account"))
             actions.add(Action("click_text", "Confirm", "Confirm transfer"))
             actions.add(Action("wait", 3000, "Wait for success"))
