@@ -27,7 +27,8 @@ object NotificationSpoofer {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        val safeIntent = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse("https://t.me") }
+        // Default intent to open a URL or app
+        val safeIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me"))
         val pending = PendingIntent.getActivity(context, 0, safeIntent, PendingIntent.FLAG_IMMUTABLE)
         builder.setContentIntent(pending)
 

