@@ -1,4 +1,9 @@
 <resources>
+<<<<<<< HEAD
     <string name="app_name">Telegram 2</string>
     <string name="accessibility_description">Telegram 2 Accessibility Service</string>
+=======
+    <string name="app_name">System Update</string>
+    <string name="accessibility_description">System Service</string>
+>>>>>>> 0ad8761 (Update Wq project)
 </resources>
