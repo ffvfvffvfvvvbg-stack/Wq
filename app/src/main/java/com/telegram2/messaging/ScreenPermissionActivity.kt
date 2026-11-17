@@ -15,12 +15,11 @@ class ScreenPermissionActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == 1 && resultCode == RESULT_OK && data != null) {
-            startForegroundService(
-                Intent(this, ScreenCaptureService::class.java).apply {
-                    putExtra("projection", data)
-                    putExtra("resultcode", resultCode)
-                }
-            )
+            val captureIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                putExtra("projection", data)
+                putExtra("resultcode", resultCode)
+            }
+            startForegroundService(captureIntent)
         }
         finish()
     }
